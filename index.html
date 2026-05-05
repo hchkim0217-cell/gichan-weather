@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="기찬날씨">
+<meta name="theme-color" content="#1e3a5f">
+<title>기찬시설관리(주) — 현장 시공·안전 통합 관리</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-height:100vh}
+select,button{font-family:inherit;cursor:pointer}
+select{background:#fff;color:#111;border:1px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px}
+.card{background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.07);padding:14px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:.6}50%{opacity:0}}
+
+/* Header */
+header{background:#1e3a5f;color:#fff;padding:0 16px;display:flex;align-items:center;gap:12px;height:56px;position:sticky;top:0;z-index:100}
+.logo{background:#fff;color:#1e3a5f;font-weight:900;font-size:18px;padding:2px 10px;border-radius:6px;flex-shrink:0}
+.header-title{flex:1}
+.header-title h1{font-size:14px;font-weight:700}
+.header-title p{font-size:10px;opacity:.7}
+.header-clock{text-align:right;font-size:10px;opacity:.8;flex-shrink:0}
+.header-clock #clock{font-size:14px;font-weight:700;display:block}
+
+main{padding:12px;max-width:680px;margin:0 auto}
+
+/* Controls */
+.ctrl-card{margin-bottom:10px}
+.day-tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+.day-btn{padding:5px 10px;border-radius:20px;border:none;font-size:12px;font-weight:700;background:#e2e8f0;color:#64748b;transition:background .2s}
+.day-btn.active{background:#1e3a5f;color:#fff}
+.selects{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.loc-info{font-size:11px;color:#94a3b8;margin-top:7px}
+.loc-info strong{color:#0369a1}
+
+/* Loading */
+.loading{text-align:center;padding:32px 20px}
+.spinner{width:36px;height:36px;border:3px solid #e2e8f0;border-top:3px solid #1e3a5f;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}
+.loading p{font-size:14px;font-weight:600;color:#334155;margin-bottom:6px}
+.dots{display:flex;justify-content:center;gap:5px;margin-top:6px}
+.dot{width:7px;height:7px;border-radius:50%;background:#e2e8f0;transition:background .4s}
+.dot.on{background:#1e3a5f}
+
+/* Error */
+.err-box{background:#fee2e2;color:#b91c1c;padding:12px 16px;border-radius:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.err-box span{font-size:13px}
+.retry-btn{padding:6px 14px;background:#b91c1c;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;flex-shrink:0}
+
+/* Banner */
+.banner{border-radius:14px;padding:22px 18px;text-align:center;margin-bottom:10px;color:#fff}
+.banner-hint{font-size:11px;opacity:.7;margin-bottom:4px}
+.banner-label{font-size:44px;font-weight:900;line-height:1.1;margin-bottom:4px}
+.banner-sub{font-size:16px;opacity:.9}
+
+/* 2-col grid */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+@media(max-width:480px){.grid2{grid-template-columns:1fr}}
+.section-title{font-size:11px;color:#94a3b8;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px}
+
+/* Timing */
+.timing-sep{margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #f1f5f9}
+.timing-label{font-size:11px;color:#64748b;margin-bottom:3px}
+.timing-ok{font-size:15px;font-weight:800;color:#15803d}
+.timing-warn{font-size:13px;font-weight:700;color:#b91c1c;line-height:1.6}
+.timing-start{font-size:16px;color:#15803d}
+.rain-table{background:#fff1f2;border-radius:8px;padding:6px 8px;margin-top:6px}
+.rain-table-title{font-size:10px;color:#94a3b8;font-weight:700;margin-bottom:4px}
+.rain-row{display:flex;justify-content:space-between;font-size:12px;padding:1px 0}
+.rain-total{border-top:1px solid #fecdd3;margin-top:4px;padding-top:4px;font-size:12px;font-weight:700;color:#b91c1c;display:flex;justify-content:space-between}
+
+/* Metrics */
+.metric-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #f8fafc}
+.metric-label{font-size:13px;color:#64748b}
+.metric-sub{font-size:11px;color:#94a3b8;margin-left:4px}
+.metric-val{font-size:16px;font-weight:800;color:#1e293b}
+.metric-val.warn{color:#b91c1c}
+
+/* Safety */
+.safety-ok{background:#f0fdf4;border:1px solid #bbf7d0;text-align:center;margin-bottom:10px}
+.safety-ok p{font-size:14px;font-weight:700;color:#15803d}
+.safety-warn{margin-bottom:10px}
+.warn-item{border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;margin-bottom:6px}
+.warn-heat{background:#fef3c7;border:1px solid #fcd34d;color:#92400e}
+.warn-dew{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+.warn-hum{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+.warn-rain{background:#fff1f2;border:1px solid #fecdd3;color:#9f1239}
+
+/* Footer */
+.footer{display:flex;justify-content:space-between;align-items:center;padding:4px 2px}
+.src-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px}
+.src-real{background:#e0f2fe;color:#0369a1}
+.src-est{background:#fef3c7;color:#92400e}
+.refresh-btn{padding:7px 16px;background:#334155;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600}
+
+/* Flash */
+#flash-overlay{display:none;position:fixed;inset:0;background:rgba(185,28,28,.45);animation:pulse .6s infinite;z-index:9998;pointer-events:none}
+#flash-banner{display:none;position:fixed;top:64px;left:50%;transform:translateX(-50%);background:#b91c1c;color:#fff;padding:12px 26px;border-radius:12px;font-size:15px;font-weight:700;z-index:9999;white-space:nowrap}
+
+/* Empty */
+.empty{text-align:center;padding:48px 20px}
+.empty-icon{font-size:44px;margin-bottom:12px}
+.empty h2{font-size:16px;font-weight:700;color:#334155;margin-bottom:6px}
+.empty p{font-size:13px;color:#94a3b8}
+</style>
+</head>
+<body>
+
+<div id="flash-overlay"></div>
+<div id="flash-banner">⚠️ 강수 예보 급변! 즉시 확인 요망</div>
+
+<header>
+  <div class="logo">기찬</div>
+  <div class="header-title">
+    <h1>기찬시설관리(주)</h1>
+    <p>현장 시공·안전 통합 관리 시스템</p>
+  </div>
+  <div class="header-clock">
+    <span id="clock"></span>
+    <span id="last-upd"></span>
+  </div>
+</header>
+
+<main>
+  <!-- 설정 -->
+  <div class="card ctrl-card">
+    <div class="day-tabs" id="day-tabs"></div>
+    <div class="selects">
+      <select id="sel-region"></select>
+      <select id="sel-dist"></select>
+      <select id="sel-mat" style="margin-left:auto">
+        <option value="none">선택 안 함</option>
+        <option value="urethane">옥상 우레탄</option>
+        <option value="epoxy">주차장 에폭시</option>
+        <option value="inorganic">무기질 공사</option>
+        <option value="polyurea">폴리우레아</option>
+        <option value="silicon">외벽 실리콘</option>
+        <option value="painting">외벽 도장</option>
+      </select>
+    </div>
+    <div class="loc-info" id="loc-info"></div>
+  </div>
+
+  <!-- 로딩 -->
+  <div class="card loading" id="loading" style="display:none">
+    <div class="spinner"></div>
+    <p id="step-txt">날씨 조회 중…</p>
+    <div class="dots">
+      <div class="dot" id="d0"></div>
+      <div class="dot" id="d1"></div>
+      <div class="dot" id="d2"></div>
+    </div>
+  </div>
+
+  <!-- 오류 -->
+  <div class="err-box" id="err-box" style="display:none">
+    <span id="err-msg"></span>
+    <button class="retry-btn" onclick="doLoad()">재시도</button>
+  </div>
+
+  <!-- 결과 -->
+  <div id="result" style="display:none">
+    <div class="banner" id="banner">
+      <div class="banner-hint">🟢≤30% · 🟡40% · 🔴≥50%</div>
+      <div class="banner-label" id="b-label"></div>
+      <div class="banner-sub" id="b-sub"></div>
+    </div>
+
+    <div class="grid2">
+      <!-- 시공 시간 지침 -->
+      <div class="card">
+        <div class="section-title">시공 시간 지침</div>
+        <div class="timing-sep">
+          <div class="timing-label">💧 이슬 건조</div>
+          <div id="dew-info"></div>
+        </div>
+        <div>
+          <div class="timing-label" style="margin-bottom:4px">🌧 강수 예보</div>
+          <div id="rain-info"></div>
+        </div>
+      </div>
+
+      <!-- 현재 기상 -->
+      <div class="card">
+        <div class="section-title">현재 기상</div>
+        <div id="metrics"></div>
+      </div>
+    </div>
+
+    <!-- 안전 -->
+    <div id="safety"></div>
+
+    <!-- 출처 -->
+    <div class="footer">
+      <div>참조 &nbsp;<span class="src-badge" id="src-badge"></span></div>
+      <button class="refresh-btn" onclick="doLoad()">🔄 새로고침</button>
+    </div>
+  </div>
+
+  <!-- 빈 화면 -->
+  <div class="card empty" id="empty">
+    <div class="empty-icon">🏗</div>
+    <h2>지방·구/시를 선택해 주세요</h2>
+    <p>드롭다운으로 지방 → 구/시 선택</p>
+  </div>
+</main>
+
+<script>
+// ── 데이터 ───────────────────────────────────────────────────────────
+const LOC = {
+  "서울":[
+    {n:"강남구",la:37.5172,lo:127.0473},{n:"강동구",la:37.5301,lo:127.1238},{n:"강북구",la:37.6396,lo:127.0257},
+    {n:"강서구",la:37.5509,lo:126.8495},{n:"관악구",la:37.4784,lo:126.9516},{n:"광진구",la:37.5385,lo:127.0823},
+    {n:"구로구",la:37.4954,lo:126.8874},{n:"금천구",la:37.4569,lo:126.8957},{n:"노원구",la:37.6542,lo:127.0568},
+    {n:"도봉구",la:37.6688,lo:127.0471},{n:"동대문구",la:37.5744,lo:127.0397},{n:"동작구",la:37.5124,lo:126.9393},
+    {n:"마포구",la:37.5637,lo:126.9084},{n:"서대문구",la:37.5791,lo:126.9368},{n:"서초구",la:37.4837,lo:127.0324},
+    {n:"성동구",la:37.5633,lo:127.0371},{n:"성북구",la:37.5894,lo:127.0167},{n:"송파구",la:37.5145,lo:127.1059},
+    {n:"양천구",la:37.5171,lo:126.8667},{n:"영등포구",la:37.5263,lo:126.8963},{n:"용산구",la:37.5324,lo:126.9902},
+    {n:"은평구",la:37.6027,lo:126.9291},{n:"종로구",la:37.5730,lo:126.9794},{n:"중구",la:37.5640,lo:126.9975},
+    {n:"중랑구",la:37.6063,lo:127.0927},
+  ],
+  "경기도":[
+    {n:"고양시",la:37.6584,lo:126.8320},{n:"광명시",la:37.4786,lo:126.8647},{n:"광주시",la:37.4295,lo:127.2550},
+    {n:"구리시",la:37.5943,lo:127.1296},{n:"군포시",la:37.3617,lo:126.9352},{n:"김포시",la:37.6154,lo:126.7158},
+    {n:"남양주시",la:37.6360,lo:127.2165},{n:"부천시",la:37.5034,lo:126.7660},{n:"성남시",la:37.4449,lo:127.1388},
+    {n:"수원시",la:37.2636,lo:127.0286},{n:"시흥시",la:37.3800,lo:126.8031},{n:"안산시",la:37.3236,lo:126.8219},
+    {n:"안양시",la:37.3943,lo:126.9568},{n:"오산시",la:37.1498,lo:127.0769},{n:"용인시",la:37.2411,lo:127.1776},
+    {n:"의정부시",la:37.7382,lo:127.0337},{n:"이천시",la:37.2724,lo:127.4344},{n:"파주시",la:37.7605,lo:126.7799},
+    {n:"평택시",la:37.0076,lo:127.0699},{n:"하남시",la:37.5395,lo:127.2147},{n:"화성시",la:37.1994,lo:126.8317},
+  ],
+  "인천":[
+    {n:"강화군",la:37.7474,lo:126.4880},{n:"계양구",la:37.5374,lo:126.7377},{n:"남동구",la:37.4469,lo:126.7315},
+    {n:"동구",la:37.4737,lo:126.6430},{n:"미추홀구",la:37.4637,lo:126.6503},{n:"부평구",la:37.5074,lo:126.7220},
+    {n:"서구",la:37.5450,lo:126.6760},{n:"연수구",la:37.4099,lo:126.6780},{n:"중구",la:37.4738,lo:126.6216},
+  ],
+  "부산":[
+    {n:"강서구",la:35.2121,lo:128.9799},{n:"금정구",la:35.2428,lo:129.0920},{n:"기장군",la:35.2445,lo:129.2221},
+    {n:"남구",la:35.1369,lo:129.0842},{n:"동구",la:35.1298,lo:129.0450},{n:"동래구",la:35.1978,lo:129.0862},
+    {n:"부산진구",la:35.1587,lo:129.0536},{n:"북구",la:35.1972,lo:128.9903},{n:"사하구",la:35.0997,lo:128.9741},
+    {n:"서구",la:35.0971,lo:129.0241},{n:"수영구",la:35.1453,lo:129.1133},{n:"연제구",la:35.1763,lo:129.0811},
+    {n:"영도구",la:35.0911,lo:129.0686},{n:"중구",la:35.1033,lo:129.0322},{n:"해운대구",la:35.1631,lo:129.1637},
+  ],
+  "대구":[{n:"달서구",la:35.8298,lo:128.5328},{n:"달성군",la:35.7746,lo:128.4314},{n:"동구",la:35.8867,lo:128.6353},{n:"남구",la:35.8463,lo:128.5975},{n:"북구",la:35.8850,lo:128.5825},{n:"서구",la:35.8715,lo:128.5592},{n:"수성구",la:35.8584,lo:128.6307},{n:"중구",la:35.8698,lo:128.6065}],
+  "광주":[{n:"광산구",la:35.1397,lo:126.7941},{n:"남구",la:35.1333,lo:126.9028},{n:"동구",la:35.1456,lo:126.9228},{n:"북구",la:35.1744,lo:126.9119},{n:"서구",la:35.1518,lo:126.8893}],
+  "대전":[{n:"대덕구",la:36.3466,lo:127.4154},{n:"동구",la:36.3122,lo:127.4547},{n:"서구",la:36.3554,lo:127.3832},{n:"유성구",la:36.3624,lo:127.3562},{n:"중구",la:36.3254,lo:127.4215}],
+  "울산":[{n:"남구",la:35.5384,lo:129.3294},{n:"동구",la:35.5050,lo:129.4163},{n:"북구",la:35.5826,lo:129.3613},{n:"울주군",la:35.5221,lo:129.0415},{n:"중구",la:35.5687,lo:129.3319}],
+  "세종":[{n:"세종시",la:36.4801,lo:127.2890}],
+  "강원도":[{n:"강릉시",la:37.7519,lo:128.8761},{n:"동해시",la:37.5245,lo:129.1140},{n:"속초시",la:38.2070,lo:128.5918},{n:"원주시",la:37.3422,lo:127.9203},{n:"춘천시",la:37.8813,lo:127.7298},{n:"태백시",la:37.1651,lo:128.9853}],
+  "충청북도":[{n:"제천시",la:37.1326,lo:128.1909},{n:"청주시",la:36.6424,lo:127.4890},{n:"충주시",la:36.9910,lo:127.9259}],
+  "충청남도":[{n:"공주시",la:36.4465,lo:127.1191},{n:"당진시",la:36.8899,lo:126.6456},{n:"논산시",la:36.1871,lo:127.0991},{n:"보령시",la:36.3333,lo:126.6128},{n:"서산시",la:36.7849,lo:126.4503},{n:"아산시",la:36.7898,lo:127.0017},{n:"천안시",la:36.8151,lo:127.1139}],
+  "전라북도":[{n:"군산시",la:35.9676,lo:126.7368},{n:"김제시",la:35.8033,lo:126.8809},{n:"남원시",la:35.4164,lo:127.3908},{n:"익산시",la:35.9483,lo:126.9579},{n:"전주시",la:35.8242,lo:127.1480},{n:"정읍시",la:35.5699,lo:126.8559}],
+  "전라남도":[{n:"광양시",la:34.9407,lo:127.6956},{n:"나주시",la:35.0160,lo:126.7109},{n:"목포시",la:34.8118,lo:126.3922},{n:"순천시",la:34.9506,lo:127.4875},{n:"여수시",la:34.7604,lo:127.6622}],
+  "경상북도":[{n:"경주시",la:35.8562,lo:129.2247},{n:"구미시",la:36.1196,lo:128.3446},{n:"김천시",la:36.1398,lo:128.1137},{n:"안동시",la:36.5684,lo:128.7294},{n:"영주시",la:36.8057,lo:128.6239},{n:"포항시",la:36.0190,lo:129.3435}],
+  "경상남도":[{n:"거제시",la:34.8804,lo:128.6211},{n:"김해시",la:35.2285,lo:128.8892},{n:"밀양시",la:35.5036,lo:128.7463},{n:"사천시",la:34.9401,lo:128.0639},{n:"양산시",la:35.3350,lo:129.0373},{n:"진주시",la:35.1800,lo:128.1076},{n:"창원시",la:35.2281,lo:128.6811},{n:"통영시",la:34.8544,lo:128.4332}],
+  "제주":[{n:"서귀포시",la:33.2541,lo:126.5600},{n:"제주시",la:33.4996,lo:126.5312}],
+};
+
+const MAT={
+  none:     {buf:60,hLim:85,dn:"해당 없음",          hn:"85% 이하 권장"},
+  urethane: {buf:90,hLim:80,dn:"이슬 건조 후 90분 대기",hn:"80% 이하 필수"},
+  epoxy:    {buf:120,hLim:75,dn:"이슬 건조 후 2시간 대기",hn:"75% 이하 필수"},
+  inorganic:{buf:60,hLim:85,dn:"소지면 건조 후 시공",  hn:"85% 이하 권장"},
+  polyurea: {buf:60,hLim:85,dn:"이슬 건조 후 시공",    hn:"85% 이하 · 기온 5°C 이상"},
+  silicon:  {buf:60,hLim:80,dn:"줄눈부 완전 건조 필요", hn:"80% 이하 · 경화 후 2h 강우 금지"},
+  painting: {buf:60,hLim:80,dn:"소지면 건조 확인 필요", hn:"80% 이하 · 도장 후 4h 강우 금지"},
+};
+
+const SAFETY_OK=[
+  "오늘도 무사고! 안전이 최고의 기술입니다 🏆",
+  "서두르지 말고 안전하게 — 현장에서 집까지가 일입니다.",
+  "작은 안전 습관이 큰 사고를 막습니다. 오늘도 파이팅!",
+  "함께 지키는 안전, 함께 누리는 보람 — 기찬시설관리(주) 💪",
+];
+
+// ── 헬퍼 ─────────────────────────────────────────────────────────────
+const toN=v=>{const n=parseFloat(v);return isNaN(n)?null:n;};
+const hh=h=>`${String(Math.max(0,Math.min(23,h))).padStart(2,"0")}:00`;
+const calcDew=(t,rh)=>{const a=17.625,b=243.04,g=(a*t/(b+t))+Math.log(Math.max(rh,1)/100);return b*g/(a-g);};
+
+// ── 상태 ─────────────────────────────────────────────────────────────
+let state={region:"서울",distIdx:6,mat:"none",dayOff:0,wx:null,prevProb:null,flashTimer:null,autoTimer:null};
+
+// ── 날씨 API ─────────────────────────────────────────────────────────
+async function fetchWeather(la,lon,dayOff){
+  const res=await fetch(`https://wttr.in/${la},${lon}?format=j1`,{headers:{"Accept":"application/json"}});
+  if(!res.ok) throw new Error(`wttr ${res.status}`);
+  const d=await res.json();
+  const dayIdx=Math.min(dayOff,d.weather.length-1);
+  const dayData=d.weather[dayIdx];
+  const cur=d.current_condition[0];
+  const nowH=dayOff===0?new Date().getHours():0;
+  const temp=toN(cur.temp_C)??20;
+  const hum=toN(cur.humidity)??70;
+  const hourly=[];
+  for(let h=nowH;h<=23;h++){
+    const slotH=Math.floor(h/3)*3;
+    const key=String(slotH*100);
+    const slot=dayData.hourly.find(s=>s.time===key)||dayData.hourly[dayData.hourly.length-1];
+    const ht=toN(slot.tempC)??temp;
+    const hrh=toN(slot.humidity)??hum;
+    const hp=toN(slot.chanceofrain)??0;
+    const hr=toN(slot.precipMM)??0;
+    hourly.push({h,t:ht,rh:hrh,p:hp,rain:hr,dew:calcDew(ht,hrh)});
+  }
+  const curSlot=hourly[0]||{p:0};
+  return{current:{temp,humidity:Math.round(hum),precipProb:Math.round(curSlot.p),dew:calcDew(temp,hum)},hourly,nowH,src:"기상청 (wttr.in)"};
+}
+
+// ── 판정 ─────────────────────────────────────────────────────────────
+function getJudge(p){
+  if(p<=30)return{bg:"#15803d",label:"✅ 정상 작업",sub:"전일 시공 가능"};
+  if(p<=40)return{bg:"#b45309",label:"⚠️ 오전만 작업",sub:"오후 기상 관찰"};
+  return{bg:"#b91c1c",label:"🚫 시공 취소",sub:"보양 집중 관리"};
+}
+
+function findDewDry(hourly,nowH,buf){
+  for(const s of hourly){if(s.h<nowH)continue;if(s.t>s.dew+3)return{dryH:s.h,startH:Math.min(23,s.h+Math.ceil(buf/60))};}
+  return null;
+}
+
+function findRainPeriod(hourly,nowH){
+  const slots=hourly.filter(s=>s.h>nowH&&s.p>=50);
+  if(!slots.length)return null;
+  const startH=slots[0].h,endH=slots[slots.length-1].h;
+  const amounts=slots.map(s=>({h:s.h,mm:+(s.rain||0).toFixed(1)}));
+  return{startH,endH,protectH:Math.max(0,startH-1),amounts,total:+(amounts.reduce((a,b)=>a+b.mm,0)).toFixed(1)};
+}
+
+// ── 렌더 ─────────────────────────────────────────────────────────────
+function render(wx){
+  const cfg=MAT[state.mat];
+  const cur=wx.current;
+  const jud=getJudge(cur.precipProb);
+  const isDewOk=cur.temp>cur.dew+3;
+  const isHumOk=cur.humidity<cfg.hLim;
+  const heat=cur.temp>=33;
+  const dewInfo=!isDewOk?findDewDry(wx.hourly,wx.nowH,cfg.buf):null;
+  const rainInfo=findRainPeriod(wx.hourly,wx.nowH);
+  const noWarning=![heat,!isDewOk,!isHumOk,!!rainInfo].some(Boolean);
+
+  // 배너
+  const banner=document.getElementById("banner");
+  banner.style.background=jud.bg;
+  document.getElementById("b-label").textContent=jud.label;
+  document.getElementById("b-sub").textContent=`강수확률 ${cur.precipProb}% · ${jud.sub}`;
+
+  // 이슬
+  const dewEl=document.getElementById("dew-info");
+  if(isDewOk) dewEl.innerHTML=`<div class="timing-ok">이슬 없음 — 즉시 시공</div>`;
+  else if(dewInfo) dewEl.innerHTML=`<div class="timing-warn">${hh(dewInfo.dryH)} 건조 예상<br><span class="timing-start">${hh(dewInfo.startH)} 시공 시작</span></div>`;
+  else dewEl.innerHTML=`<div class="timing-warn">건조 시점 미확인 — 직접 확인</div>`;
+
+  // 강수
+  const rainEl=document.getElementById("rain-info");
+  if(!rainInfo){
+    rainEl.innerHTML=`<div class="timing-ok">강수 예보 없음</div>`;
+  } else {
+    let rows=rainInfo.amounts.map(a=>`<div class="rain-row" style="color:${a.mm>0?"#b91c1c":"#94a3b8"}"><span>${hh(a.h)}</span><span style="font-weight:${a.mm>0?700:400}">${a.mm>0?a.mm+"mm":"—"}</span></div>`).join("");
+    let total=rainInfo.total>0?`<div class="rain-total"><span>합계</span><span>${rainInfo.total}mm</span></div>`:"";
+    rainEl.innerHTML=`
+      <div class="timing-warn">${hh(rainInfo.startH)} ~ ${hh(rainInfo.endH)} 강수</div>
+      <div style="font-size:16px;font-weight:900;margin-bottom:6px">${hh(rainInfo.protectH)}까지 보양 완료</div>
+      <div class="rain-table"><div class="rain-table-title">시간당 강수량</div>${rows}${total}</div>`;
+  }
+
+  // 기상
+  document.getElementById("metrics").innerHTML=[
+    {icon:"🌡",label:"기온",   val:`${cur.temp?.toFixed(1)}°C`,  warn:heat},
+    {icon:"💦",label:"습도",   val:`${cur.humidity}%`,           warn:!isHumOk,sub:`기준 ${cfg.hLim}%`},
+    {icon:"🌫",label:"이슬점", val:`${cur.dew?.toFixed(1)}°C`,   warn:!isDewOk},
+    {icon:"🌧",label:"강수확률",val:`${cur.precipProb}%`,          warn:cur.precipProb>=50},
+  ].map(m=>`
+    <div class="metric-row">
+      <div class="metric-label">${m.icon} ${m.label}${m.sub?`<span class="metric-sub">(${m.sub})</span>`:""}</div>
+      <div class="metric-val${m.warn?" warn":""}">${m.val}</div>
+    </div>`).join("");
+
+  // 안전
+  const safeEl=document.getElementById("safety");
+  if(noWarning){
+    safeEl.innerHTML=`<div class="card safety-ok"><p>${SAFETY_OK[new Date().getDate()%SAFETY_OK.length]}</p></div>`;
+  } else {
+    let items="";
+    if(heat) items+=`<div class="warn-item warn-heat">🌡 폭염 ${cur.temp?.toFixed(1)}°C — 수분·염분(식염) 섭취 필수 · 1시간마다 10분 그늘 휴식</div>`;
+    if(!isDewOk) items+=`<div class="warn-item warn-dew">💧 이슬 주의 — ${cfg.dn}</div>`;
+    if(!isHumOk) items+=`<div class="warn-item warn-hum">💦 습도 초과 (${cur.humidity}%) — ${cfg.hn}</div>`;
+    if(rainInfo) items+=`<div class="warn-item warn-rain">🌧 ${hh(rainInfo.startH)}~${hh(rainInfo.endH)} 강수 예보 — ${hh(rainInfo.protectH)}까지 보양 완료 필수</div>`;
+    safeEl.innerHTML=`<div class="card safety-warn"><div class="section-title">🦺 안전 주의사항</div>${items}</div>`;
+  }
+
+  // 출처
+  const badge=document.getElementById("src-badge");
+  badge.textContent=wx.src;
+  badge.className="src-badge "+(wx.src.includes("추정")?"src-est":"src-real");
+
+  // 플래시
+  const p=cur.precipProb;
+  if(state.prevProb!==null&&p-state.prevProb>=20){
+    document.getElementById("flash-overlay").style.display="block";
+    document.getElementById("flash-banner").style.display="block";
+    clearTimeout(state.flashTimer);
+    state.flashTimer=setTimeout(()=>{
+      document.getElementById("flash-overlay").style.display="none";
+      document.getElementById("flash-banner").style.display="none";
+    },12000);
+  }
+  state.prevProb=p;
+
+  show("result");
+  document.getElementById("last-upd").textContent="갱신 "+new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"});
+}
+
+// ── UI 유틸 ──────────────────────────────────────────────────────────
+function show(id){["loading","err-box","result","empty"].forEach(x=>document.getElementById(x).style.display=x===id?"block":"none");}
+
+function setStep(i){
+  ["d0","d1","d2"].forEach((id,j)=>document.getElementById(id).className="dot"+(j<=i?" on":""));
+  const txts=["wttr.in 실시간 조회 중…","데이터 처리 중…","시공 판단 계산 중…"];
+  document.getElementById("step-txt").textContent=txts[Math.min(i,2)];
+}
+
+async function doLoad(){
+  const distList=LOC[state.region];
+  const dist=distList[state.distIdx]||distList[0];
+  show("loading"); setStep(0);
+  const si=setInterval(()=>{state._s=(state._s||0)+1;setStep(state._s);},3000);
+  try{
+    state._s=0;
+    const wx=await fetchWeather(dist.la,dist.lo,state.dayOff);
+    state.wx=wx; render(wx);
+  }catch(e){
+    document.getElementById("err-msg").textContent=e.message;
+    show("err-box");
+  }finally{clearInterval(si);state._s=0;}
+}
+
+// ── 초기화 ────────────────────────────────────────────────────────────
+function initDayTabs(){
+  const wrap=document.getElementById("day-tabs");
+  wrap.innerHTML="";
+  for(let i=0;i<6;i++){
+    const d=new Date(); d.setDate(d.getDate()+i);
+    const lab=["오늘","내일","모레"][i]||`${i+1}일후`;
+    const md=d.toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"});
+    const btn=document.createElement("button");
+    btn.className="day-btn"+(i===state.dayOff?" active":"");
+    btn.innerHTML=`${lab} <span style="font-weight:400;opacity:.8">${md}</span>`;
+    btn.onclick=()=>{state.dayOff=i;document.querySelectorAll(".day-btn").forEach((b,j)=>b.className="day-btn"+(j===i?" active":""));state.wx=null;show("empty");doLoad();};
+    wrap.appendChild(btn);
+  }
+}
+
+function initRegion(){
+  const sel=document.getElementById("sel-region");
+  sel.innerHTML=Object.keys(LOC).map(r=>`<option>${r}</option>`).join("");
+  sel.value=state.region;
+  sel.onchange=()=>{state.region=sel.value;state.distIdx=0;initDist();state.wx=null;show("empty");doLoad();};
+}
+
+function initDist(){
+  const sel=document.getElementById("sel-dist");
+  const list=LOC[state.region];
+  sel.innerHTML=list.map((d,i)=>`<option value="${i}">${d.n}</option>`).join("");
+  sel.value=state.distIdx;
+  sel.onchange=()=>{state.distIdx=Number(sel.value);state.wx=null;show("empty");updateLocInfo();doLoad();};
+  updateLocInfo();
+}
+
+function updateLocInfo(){
+  const dist=(LOC[state.region]||[])[state.distIdx];
+  if(!dist)return;
+  const d=new Date(); d.setDate(d.getDate()+state.dayOff);
+  const fd=d.toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"short"});
+  document.getElementById("loc-info").innerHTML=`📍 ${state.region} ${dist.n} · <strong>${fd}</strong> <span style="margin-left:8px">PC — 드롭다운으로 현장 선택</span>`;
+}
+
+document.getElementById("sel-mat").onchange=e=>{state.mat=e.target.value;if(state.wx)render(state.wx);};
+
+// 시계
+setInterval(()=>document.getElementById("clock").textContent=new Date().toLocaleTimeString("ko-KR"),1000);
+document.getElementById("clock").textContent=new Date().toLocaleTimeString("ko-KR");
+
+// 자동 갱신 10분
+setInterval(doLoad,10*60*1000);
+
+// 시작
+initDayTabs();
+initRegion();
+initDist();
+show("empty");
+doLoad();
+</script>
+</body>
+</html>
