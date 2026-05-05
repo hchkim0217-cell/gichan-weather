@@ -6,20 +6,25 @@ export default async function handler(req, res) {
   let url = '';
 
   if (type === 'short') {
-    // 단기예보 (오늘~모레)
+    // 단기예보 (오늘~모레, 1~3시간 간격)
     url = `https://apihub.kma.go.kr/api/typ02/openApi/VilageFcstInfoService_2.0/getVilageFcst`
       + `?pageNo=1&numOfRows=1000&dataType=JSON`
       + `&base_date=${base_date}&base_time=${base_time}`
       + `&nx=${nx}&ny=${ny}&authKey=${KEY}`;
 
+  } else if (type === 'ultra_short') {
+    // 초단기예보 (향후 6시간, 1시간 간격, 더 정확)
+    url = `https://apihub.kma.go.kr/api/typ02/openApi/VilageFcstInfoService_2.0/getUltraSrtFcst`
+      + `?pageNo=1&numOfRows=300&dataType=JSON`
+      + `&base_date=${base_date}&base_time=${base_time}`
+      + `&nx=${nx}&ny=${ny}&authKey=${KEY}`;
+
   } else if (type === 'mid_land') {
-    // 중기육상예보 (4~10일 강수확률)
     url = `https://apihub.kma.go.kr/api/typ02/openApi/MidFcstInfoService/getMidLandFcst`
       + `?pageNo=1&numOfRows=10&dataType=JSON`
       + `&regId=${regId}&tmFc=${tmFc}&authKey=${KEY}`;
 
   } else if (type === 'mid_temp') {
-    // 중기기온예보 (4~10일 기온)
     url = `https://apihub.kma.go.kr/api/typ02/openApi/MidFcstInfoService/getMidTa`
       + `?pageNo=1&numOfRows=10&dataType=JSON`
       + `&regId=${regId}&tmFc=${tmFc}&authKey=${KEY}`;
