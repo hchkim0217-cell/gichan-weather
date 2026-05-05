@@ -137,18 +137,15 @@ main{padding:12px;max-width:680px;margin:0 auto}
     </div>
     <div id="tmrwarn"></div>
 
-    <!-- 시공 시간 지침 (강조 / 풀폭) -->
-    <div class="timing-card">
-      <div class="timing-title">📋 시공 시간 지침</div>
-      <div class="timing-grid">
-        <div class="tcol dew">
-          <div class="tcol-label">💧 이슬 건조</div>
-          <div id="dewinfo"></div>
-        </div>
-        <div class="tcol rain">
-          <div class="tcol-label">🌧 강수 예보</div>
-          <div id="raininfo"></div>
-        </div>
+    <!-- 시공 시간 지침 -->
+    <div class="grid2">
+      <div class="card">
+        <div class="stitle">💧 이슬 건조</div>
+        <div id="dewinfo"></div>
+      </div>
+      <div class="card">
+        <div class="stitle">🌧 강수 예보</div>
+        <div id="raininfo"></div>
       </div>
     </div>
 
@@ -253,6 +250,17 @@ function getMidTmFc(){
   const yd=new Date(now); yd.setDate(yd.getDate()-1);
   const yy=yd.getFullYear(),ym=String(yd.getMonth()+1).padStart(2,'0'),ydd=String(yd.getDate()).padStart(2,'0');
   return `${yy}${ym}${ydd}1800`;
+}
+
+function getPrevMidTmFc(){
+  const now=new Date();
+  const h=now.getHours();
+  const y=now.getFullYear(),m=String(now.getMonth()+1).padStart(2,'0'),d=String(now.getDate()).padStart(2,'0');
+  if(h>=18) return `${y}${m}${d}0600`;
+  const yd=new Date(now); yd.setDate(yd.getDate()-1);
+  const yy=yd.getFullYear(),ym=String(yd.getMonth()+1).padStart(2,'0'),ydd=String(yd.getDate()).padStart(2,'0');
+  if(h>=6) return `${yy}${ym}${ydd}1800`;
+  return `${yy}${ym}${ydd}0600`;
 }
 
 function dateStr(off){
@@ -365,9 +373,21 @@ async function fetchMid(regId,dayOff){
   ]);
   const[land,temp]=await Promise.all([landRes.json(),tempRes.json()]);
 
-  const li=land.response?.body?.items?.item?.[0];
-  const ti=temp.response?.body?.items?.item?.[0];
-  if(!li||!ti)throw new Error('중기예보 데이터 없음');
+  let li=land.response?.body?.items?.item?.[0];
+  let ti=temp.response?.body?.items?.item?.[0];
+
+  // 최신 발표 데이터가 아직 미생성 시 → 이전 발표시각으로 재시도
+  if(!li||!ti){
+    const prevTmFc=getPrevMidTmFc();
+    const[land2,temp2]=await Promise.all([
+      !li?fetch(`/api/weather?type=mid_land&regId=${regId}&tmFc=${prevTmFc}`).then(r=>r.json()):Promise.resolve(land),
+      !ti?fetch(`/api/weather?type=mid_temp&regId=${regId}&tmFc=${prevTmFc}`).then(r=>r.json()):Promise.resolve(temp)
+    ]);
+    if(!li)li=land2.response?.body?.items?.item?.[0];
+    if(!ti)ti=temp2.response?.body?.items?.item?.[0];
+  }
+
+  if(!li||!ti)throw new Error(`중기예보 데이터 없음 (지역코드: ${regId})`);
 
   const d=dayOff;
   const amPop=parseInt(li[`rnSt${d}Am`]??li[`rnSt${d}`]??0);
@@ -465,7 +485,7 @@ function render(wx){
   // 배너
   document.getElementById('banner').style.background=jud.bg;
   document.getElementById('blabel').textContent=jud.label;
-  document.getElementById('bsub').innerHTML=`${jud.sub}<div class="bprob">오전 ${amProb}% &nbsp;/&nbsp; 오후 ${pmProb}%</div>`;
+  document.getElementById('bsub').innerHTML=jud.sub;
 
   // 내일 보양 경고
   const tw=document.getElementById('tmrwarn');
@@ -476,22 +496,22 @@ function render(wx){
   // 이슬
   const dEl=document.getElementById('dewinfo');
   if(isDewOk) {
-    dEl.innerHTML=`<div class="tok-big">이슬 조건 없음<br><span style="font-size:14px;font-weight:600">— 시공 가능</span></div>`;
+    dEl.innerHTML=`<div class="tok">이슬 조건 없음</div><div class="tok-sub">— 시공 가능</div>`;
   } else if(dewInfo) {
-    dEl.innerHTML=`<div class="twarn-big">이슬 ${hh(dewInfo.dryH)} 건조 예상</div><div class="tstart-big">${hh(dewInfo.startH)} 시공 시작</div>`;
+    dEl.innerHTML=`<div class="twarn">이슬 ${hh(dewInfo.dryH)} 건조 예상</div><div class="tstart">${hh(dewInfo.startH)} 시공 시작</div>`;
   } else {
-    dEl.innerHTML=`<div class="twarn-big">이슬 주의</div><div style="font-size:14px;color:#374151;margin-top:4px">표면 직접 확인 후 시공</div>`;
+    dEl.innerHTML=`<div class="twarn">이슬 주의</div><div class="tok-sub" style="margin-top:4px">표면 직접 확인 후 시공</div>`;
   }
 
   // 강수
   const rEl=document.getElementById('raininfo');
   if(!rainInfo){
-    rEl.innerHTML=`<div class="tok-big">강수 예보 없음<br><span style="font-size:14px;font-weight:600">— 보양 불요</span></div>`;
+    rEl.innerHTML=`<div class="tok">강수 예보 없음</div><div class="tok-sub">— 보양 불요</div>`;
   } else {
     const rows=rainInfo.am.map(a=>`<div class="rrow" style="color:${a.mm>0?'#b91c1c':'#94a3b8'}"><span>${hh(a.h)}</span><span style="font-weight:${a.mm>0?700:400}">${a.mm>0?a.mm+'mm':'—'}</span></div>`).join('');
     const tot=rainInfo.total>0?`<div class="rtotal"><span>합계</span><span>${rainInfo.total}mm</span></div>`:'';
-    rEl.innerHTML=`<div class="twarn-big">${hh(rainInfo.sH)} ~ ${hh(rainInfo.eH)} 강수</div>
-      <div class="tprot-big">${hh(rainInfo.protH)}까지 보양 완료</div>
+    rEl.innerHTML=`<div class="twarn">${hh(rainInfo.sH)} ~ ${hh(rainInfo.eH)} 강수</div>
+      <div class="tprot">${hh(rainInfo.protH)}까지 보양 완료</div>
       <div class="rtable"><div class="rtitle">시간당 강수량</div>${rows}${tot}</div>`;
   }
 
