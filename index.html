@@ -25,6 +25,8 @@ main{padding:12px;max-width:680px;margin:0 auto}
 .dtabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
 .dbtn{padding:5px 10px;border-radius:20px;border:none;font-size:12px;font-weight:700;background:#e2e8f0;color:#64748b}
 .dbtn.on{background:#1e3a5f;color:#fff}
+.dbtn.mid{background:#e8f0fe;color:#3b5bdb}
+.dbtn.mid.on{background:#3b5bdb;color:#fff}
 .sels{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .locinfo{font-size:11px;color:#94a3b8;margin-top:7px}
 .locinfo strong{color:#0369a1}
@@ -36,11 +38,12 @@ main{padding:12px;max-width:680px;margin:0 auto}
 .dot.on{background:#1e3a5f}
 .errbox{background:#fee2e2;color:#b91c1c;padding:12px 16px;border-radius:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px}
 .errbox span{font-size:13px}
-.rbtn{padding:6px 14px;background:#b91c1c;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;flex-shrink:0}
+.rbtn{padding:6px 14px;background:#b91c1c;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700}
 .banner{border-radius:14px;padding:22px 18px;text-align:center;margin-bottom:10px;color:#fff}
 .bhint{font-size:11px;opacity:.7;margin-bottom:4px}
 .blabel{font-size:44px;font-weight:900;line-height:1.1;margin-bottom:4px}
 .bsub{font-size:16px;opacity:.9}
+.midnotice{background:#e8f0fe;border:1px solid #3b5bdb;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#1e3a8a}
 .tmrwarn{border-radius:12px;padding:14px 16px;margin-bottom:10px;background:#7f1d1d;color:#fff;border-left:5px solid #ef4444}
 .tmrwarn .tw1{font-size:13px;font-weight:900;margin-bottom:4px}
 .tmrwarn .tw2{font-size:13px;opacity:.9}
@@ -70,7 +73,9 @@ main{padding:12px;max-width:680px;margin:0 auto}
 .wm{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
 .wr{background:#fff1f2;border:1px solid #fecdd3;color:#9f1239}
 .footer{display:flex;justify-content:space-between;align-items:center;padding:4px 2px}
-.sbadge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:#dcfce7;color:#166534}
+.sbadge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px}
+.badge-short{background:#dcfce7;color:#166534}
+.badge-mid{background:#e8f0fe;color:#1e3a8a}
 .refbtn{padding:7px 16px;background:#334155;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600}
 #fover{display:none;position:fixed;inset:0;background:rgba(185,28,28,.45);animation:pulse .6s infinite;z-index:9998;pointer-events:none}
 #fbanner{display:none;position:fixed;top:64px;left:50%;transform:translateX(-50%);background:#b91c1c;color:#fff;padding:12px 26px;border-radius:12px;font-size:15px;font-weight:700;z-index:9999;white-space:nowrap}
@@ -121,6 +126,7 @@ main{padding:12px;max-width:680px;margin:0 auto}
   </div>
 
   <div id="result" style="display:none">
+    <div id="midnotice"></div>
     <div class="banner" id="banner">
       <div class="bhint">🟢≤30% · 🟡40% · 🔴≥50%</div>
       <div class="blabel" id="blabel"></div>
@@ -134,13 +140,13 @@ main{padding:12px;max-width:680px;margin:0 auto}
         <div><div class="tlabel" style="margin-bottom:4px">🌧 강수 예보</div><div id="raininfo"></div></div>
       </div>
       <div class="card">
-        <div class="stitle">현재 기상</div>
+        <div class="stitle">기상 정보</div>
         <div id="metrics"></div>
       </div>
     </div>
     <div id="safety"></div>
     <div class="footer">
-      <div style="font-size:12px;color:#94a3b8">참조 &nbsp;<span class="sbadge">기상청 단기예보</span></div>
+      <div style="font-size:12px;color:#94a3b8">참조 &nbsp;<span class="sbadge" id="srcbadge"></span></div>
       <button class="refbtn" onclick="doLoad()">🔄 새로고침</button>
     </div>
   </div>
@@ -154,23 +160,23 @@ main{padding:12px;max-width:680px;margin:0 auto}
 
 <script>
 const LOC={
-  "서울":[{n:"강남구",la:37.5172,lo:127.0473},{n:"강동구",la:37.5301,lo:127.1238},{n:"강북구",la:37.6396,lo:127.0257},{n:"강서구",la:37.5509,lo:126.8495},{n:"관악구",la:37.4784,lo:126.9516},{n:"광진구",la:37.5385,lo:127.0823},{n:"구로구",la:37.4954,lo:126.8874},{n:"금천구",la:37.4569,lo:126.8957},{n:"노원구",la:37.6542,lo:127.0568},{n:"도봉구",la:37.6688,lo:127.0471},{n:"동대문구",la:37.5744,lo:127.0397},{n:"동작구",la:37.5124,lo:126.9393},{n:"마포구",la:37.5637,lo:126.9084},{n:"서대문구",la:37.5791,lo:126.9368},{n:"서초구",la:37.4837,lo:127.0324},{n:"성동구",la:37.5633,lo:127.0371},{n:"성북구",la:37.5894,lo:127.0167},{n:"송파구",la:37.5145,lo:127.1059},{n:"양천구",la:37.5171,lo:126.8667},{n:"영등포구",la:37.5263,lo:126.8963},{n:"용산구",la:37.5324,lo:126.9902},{n:"은평구",la:37.6027,lo:126.9291},{n:"종로구",la:37.5730,lo:126.9794},{n:"중구",la:37.5640,lo:126.9975},{n:"중랑구",la:37.6063,lo:127.0927}],
-  "경기도":[{n:"고양시",la:37.6584,lo:126.8320},{n:"광명시",la:37.4786,lo:126.8647},{n:"광주시",la:37.4295,lo:127.2550},{n:"구리시",la:37.5943,lo:127.1296},{n:"군포시",la:37.3617,lo:126.9352},{n:"김포시",la:37.6154,lo:126.7158},{n:"남양주시",la:37.6360,lo:127.2165},{n:"부천시",la:37.5034,lo:126.7660},{n:"성남시",la:37.4449,lo:127.1388},{n:"수원시",la:37.2636,lo:127.0286},{n:"시흥시",la:37.3800,lo:126.8031},{n:"안산시",la:37.3236,lo:126.8219},{n:"안양시",la:37.3943,lo:126.9568},{n:"오산시",la:37.1498,lo:127.0769},{n:"용인시",la:37.2411,lo:127.1776},{n:"의정부시",la:37.7382,lo:127.0337},{n:"이천시",la:37.2724,lo:127.4344},{n:"파주시",la:37.7605,lo:126.7799},{n:"평택시",la:37.0076,lo:127.0699},{n:"하남시",la:37.5395,lo:127.2147},{n:"화성시",la:37.1994,lo:126.8317}],
-  "인천":[{n:"강화군",la:37.7474,lo:126.4880},{n:"계양구",la:37.5374,lo:126.7377},{n:"남동구",la:37.4469,lo:126.7315},{n:"동구",la:37.4737,lo:126.6430},{n:"미추홀구",la:37.4637,lo:126.6503},{n:"부평구",la:37.5074,lo:126.7220},{n:"서구",la:37.5450,lo:126.6760},{n:"연수구",la:37.4099,lo:126.6780},{n:"중구",la:37.4738,lo:126.6216}],
-  "부산":[{n:"강서구",la:35.2121,lo:128.9799},{n:"금정구",la:35.2428,lo:129.0920},{n:"기장군",la:35.2445,lo:129.2221},{n:"남구",la:35.1369,lo:129.0842},{n:"동구",la:35.1298,lo:129.0450},{n:"동래구",la:35.1978,lo:129.0862},{n:"부산진구",la:35.1587,lo:129.0536},{n:"북구",la:35.1972,lo:128.9903},{n:"사하구",la:35.0997,lo:128.9741},{n:"서구",la:35.0971,lo:129.0241},{n:"수영구",la:35.1453,lo:129.1133},{n:"연제구",la:35.1763,lo:129.0811},{n:"영도구",la:35.0911,lo:129.0686},{n:"중구",la:35.1033,lo:129.0322},{n:"해운대구",la:35.1631,lo:129.1637}],
-  "대구":[{n:"달서구",la:35.8298,lo:128.5328},{n:"달성군",la:35.7746,lo:128.4314},{n:"동구",la:35.8867,lo:128.6353},{n:"남구",la:35.8463,lo:128.5975},{n:"북구",la:35.8850,lo:128.5825},{n:"서구",la:35.8715,lo:128.5592},{n:"수성구",la:35.8584,lo:128.6307},{n:"중구",la:35.8698,lo:128.6065}],
-  "광주":[{n:"광산구",la:35.1397,lo:126.7941},{n:"남구",la:35.1333,lo:126.9028},{n:"동구",la:35.1456,lo:126.9228},{n:"북구",la:35.1744,lo:126.9119},{n:"서구",la:35.1518,lo:126.8893}],
-  "대전":[{n:"대덕구",la:36.3466,lo:127.4154},{n:"동구",la:36.3122,lo:127.4547},{n:"서구",la:36.3554,lo:127.3832},{n:"유성구",la:36.3624,lo:127.3562},{n:"중구",la:36.3254,lo:127.4215}],
-  "울산":[{n:"남구",la:35.5384,lo:129.3294},{n:"동구",la:35.5050,lo:129.4163},{n:"북구",la:35.5826,lo:129.3613},{n:"울주군",la:35.5221,lo:129.0415},{n:"중구",la:35.5687,lo:129.3319}],
-  "세종":[{n:"세종시",la:36.4801,lo:127.2890}],
-  "강원도":[{n:"강릉시",la:37.7519,lo:128.8761},{n:"동해시",la:37.5245,lo:129.1140},{n:"속초시",la:38.2070,lo:128.5918},{n:"원주시",la:37.3422,lo:127.9203},{n:"춘천시",la:37.8813,lo:127.7298},{n:"태백시",la:37.1651,lo:128.9853}],
-  "충청북도":[{n:"제천시",la:37.1326,lo:128.1909},{n:"청주시",la:36.6424,lo:127.4890},{n:"충주시",la:36.9910,lo:127.9259}],
-  "충청남도":[{n:"공주시",la:36.4465,lo:127.1191},{n:"당진시",la:36.8899,lo:126.6456},{n:"논산시",la:36.1871,lo:127.0991},{n:"보령시",la:36.3333,lo:126.6128},{n:"서산시",la:36.7849,lo:126.4503},{n:"아산시",la:36.7898,lo:127.0017},{n:"천안시",la:36.8151,lo:127.1139}],
-  "전라북도":[{n:"군산시",la:35.9676,lo:126.7368},{n:"김제시",la:35.8033,lo:126.8809},{n:"남원시",la:35.4164,lo:127.3908},{n:"익산시",la:35.9483,lo:126.9579},{n:"전주시",la:35.8242,lo:127.1480},{n:"정읍시",la:35.5699,lo:126.8559}],
-  "전라남도":[{n:"광양시",la:34.9407,lo:127.6956},{n:"나주시",la:35.0160,lo:126.7109},{n:"목포시",la:34.8118,lo:126.3922},{n:"순천시",la:34.9506,lo:127.4875},{n:"여수시",la:34.7604,lo:127.6622}],
-  "경상북도":[{n:"경주시",la:35.8562,lo:129.2247},{n:"구미시",la:36.1196,lo:128.3446},{n:"김천시",la:36.1398,lo:128.1137},{n:"안동시",la:36.5684,lo:128.7294},{n:"영주시",la:36.8057,lo:128.6239},{n:"포항시",la:36.0190,lo:129.3435}],
-  "경상남도":[{n:"거제시",la:34.8804,lo:128.6211},{n:"김해시",la:35.2285,lo:128.8892},{n:"밀양시",la:35.5036,lo:128.7463},{n:"사천시",la:34.9401,lo:128.0639},{n:"양산시",la:35.3350,lo:129.0373},{n:"진주시",la:35.1800,lo:128.1076},{n:"창원시",la:35.2281,lo:128.6811},{n:"통영시",la:34.8544,lo:128.4332}],
-  "제주":[{n:"서귀포시",la:33.2541,lo:126.5600},{n:"제주시",la:33.4996,lo:126.5312}]
+  "서울":[{n:"강남구",la:37.5172,lo:127.0473,midRegId:"11B10101"},{n:"강동구",la:37.5301,lo:127.1238,midRegId:"11B10101"},{n:"강북구",la:37.6396,lo:127.0257,midRegId:"11B10101"},{n:"강서구",la:37.5509,lo:126.8495,midRegId:"11B10101"},{n:"관악구",la:37.4784,lo:126.9516,midRegId:"11B10101"},{n:"광진구",la:37.5385,lo:127.0823,midRegId:"11B10101"},{n:"구로구",la:37.4954,lo:126.8874,midRegId:"11B10101"},{n:"금천구",la:37.4569,lo:126.8957,midRegId:"11B10101"},{n:"노원구",la:37.6542,lo:127.0568,midRegId:"11B10101"},{n:"도봉구",la:37.6688,lo:127.0471,midRegId:"11B10101"},{n:"동대문구",la:37.5744,lo:127.0397,midRegId:"11B10101"},{n:"동작구",la:37.5124,lo:126.9393,midRegId:"11B10101"},{n:"마포구",la:37.5637,lo:126.9084,midRegId:"11B10101"},{n:"서대문구",la:37.5791,lo:126.9368,midRegId:"11B10101"},{n:"서초구",la:37.4837,lo:127.0324,midRegId:"11B10101"},{n:"성동구",la:37.5633,lo:127.0371,midRegId:"11B10101"},{n:"성북구",la:37.5894,lo:127.0167,midRegId:"11B10101"},{n:"송파구",la:37.5145,lo:127.1059,midRegId:"11B10101"},{n:"양천구",la:37.5171,lo:126.8667,midRegId:"11B10101"},{n:"영등포구",la:37.5263,lo:126.8963,midRegId:"11B10101"},{n:"용산구",la:37.5324,lo:126.9902,midRegId:"11B10101"},{n:"은평구",la:37.6027,lo:126.9291,midRegId:"11B10101"},{n:"종로구",la:37.5730,lo:126.9794,midRegId:"11B10101"},{n:"중구",la:37.5640,lo:126.9975,midRegId:"11B10101"},{n:"중랑구",la:37.6063,lo:127.0927,midRegId:"11B10101"}],
+  "경기도":[{n:"고양시",la:37.6584,lo:126.8320,midRegId:"11B20601"},{n:"광명시",la:37.4786,lo:126.8647,midRegId:"11B20601"},{n:"광주시",la:37.4295,lo:127.2550,midRegId:"11B20601"},{n:"구리시",la:37.5943,lo:127.1296,midRegId:"11B20601"},{n:"군포시",la:37.3617,lo:126.9352,midRegId:"11B20601"},{n:"김포시",la:37.6154,lo:126.7158,midRegId:"11B20601"},{n:"남양주시",la:37.6360,lo:127.2165,midRegId:"11B20601"},{n:"부천시",la:37.5034,lo:126.7660,midRegId:"11B20601"},{n:"성남시",la:37.4449,lo:127.1388,midRegId:"11B20601"},{n:"수원시",la:37.2636,lo:127.0286,midRegId:"11B20601"},{n:"시흥시",la:37.3800,lo:126.8031,midRegId:"11B20601"},{n:"안산시",la:37.3236,lo:126.8219,midRegId:"11B20601"},{n:"안양시",la:37.3943,lo:126.9568,midRegId:"11B20601"},{n:"오산시",la:37.1498,lo:127.0769,midRegId:"11B20601"},{n:"용인시",la:37.2411,lo:127.1776,midRegId:"11B20601"},{n:"의정부시",la:37.7382,lo:127.0337,midRegId:"11B20601"},{n:"이천시",la:37.2724,lo:127.4344,midRegId:"11B20601"},{n:"파주시",la:37.7605,lo:126.7799,midRegId:"11B20601"},{n:"평택시",la:37.0076,lo:127.0699,midRegId:"11B20601"},{n:"하남시",la:37.5395,lo:127.2147,midRegId:"11B20601"},{n:"화성시",la:37.1994,lo:126.8317,midRegId:"11B20601"}],
+  "인천":[{n:"강화군",la:37.7474,lo:126.4880,midRegId:"11B20201"},{n:"계양구",la:37.5374,lo:126.7377,midRegId:"11B20201"},{n:"남동구",la:37.4469,lo:126.7315,midRegId:"11B20201"},{n:"동구",la:37.4737,lo:126.6430,midRegId:"11B20201"},{n:"미추홀구",la:37.4637,lo:126.6503,midRegId:"11B20201"},{n:"부평구",la:37.5074,lo:126.7220,midRegId:"11B20201"},{n:"서구",la:37.5450,lo:126.6760,midRegId:"11B20201"},{n:"연수구",la:37.4099,lo:126.6780,midRegId:"11B20201"},{n:"중구",la:37.4738,lo:126.6216,midRegId:"11B20201"}],
+  "부산":[{n:"강서구",la:35.2121,lo:128.9799,midRegId:"11H20201"},{n:"금정구",la:35.2428,lo:129.0920,midRegId:"11H20201"},{n:"기장군",la:35.2445,lo:129.2221,midRegId:"11H20201"},{n:"남구",la:35.1369,lo:129.0842,midRegId:"11H20201"},{n:"동구",la:35.1298,lo:129.0450,midRegId:"11H20201"},{n:"동래구",la:35.1978,lo:129.0862,midRegId:"11H20201"},{n:"부산진구",la:35.1587,lo:129.0536,midRegId:"11H20201"},{n:"북구",la:35.1972,lo:128.9903,midRegId:"11H20201"},{n:"사하구",la:35.0997,lo:128.9741,midRegId:"11H20201"},{n:"서구",la:35.0971,lo:129.0241,midRegId:"11H20201"},{n:"수영구",la:35.1453,lo:129.1133,midRegId:"11H20201"},{n:"연제구",la:35.1763,lo:129.0811,midRegId:"11H20201"},{n:"영도구",la:35.0911,lo:129.0686,midRegId:"11H20201"},{n:"중구",la:35.1033,lo:129.0322,midRegId:"11H20201"},{n:"해운대구",la:35.1631,lo:129.1637,midRegId:"11H20201"}],
+  "대구":[{n:"달서구",la:35.8298,lo:128.5328,midRegId:"11H10701"},{n:"달성군",la:35.7746,lo:128.4314,midRegId:"11H10701"},{n:"동구",la:35.8867,lo:128.6353,midRegId:"11H10701"},{n:"남구",la:35.8463,lo:128.5975,midRegId:"11H10701"},{n:"북구",la:35.8850,lo:128.5825,midRegId:"11H10701"},{n:"서구",la:35.8715,lo:128.5592,midRegId:"11H10701"},{n:"수성구",la:35.8584,lo:128.6307,midRegId:"11H10701"},{n:"중구",la:35.8698,lo:128.6065,midRegId:"11H10701"}],
+  "광주":[{n:"광산구",la:35.1397,lo:126.7941,midRegId:"11F20501"},{n:"남구",la:35.1333,lo:126.9028,midRegId:"11F20501"},{n:"동구",la:35.1456,lo:126.9228,midRegId:"11F20501"},{n:"북구",la:35.1744,lo:126.9119,midRegId:"11F20501"},{n:"서구",la:35.1518,lo:126.8893,midRegId:"11F20501"}],
+  "대전":[{n:"대덕구",la:36.3466,lo:127.4154,midRegId:"11C20401"},{n:"동구",la:36.3122,lo:127.4547,midRegId:"11C20401"},{n:"서구",la:36.3554,lo:127.3832,midRegId:"11C20401"},{n:"유성구",la:36.3624,lo:127.3562,midRegId:"11C20401"},{n:"중구",la:36.3254,lo:127.4215,midRegId:"11C20401"}],
+  "울산":[{n:"남구",la:35.5384,lo:129.3294,midRegId:"11H20101"},{n:"동구",la:35.5050,lo:129.4163,midRegId:"11H20101"},{n:"북구",la:35.5826,lo:129.3613,midRegId:"11H20101"},{n:"울주군",la:35.5221,lo:129.0415,midRegId:"11H20101"},{n:"중구",la:35.5687,lo:129.3319,midRegId:"11H20101"}],
+  "세종":[{n:"세종시",la:36.4801,lo:127.2890,midRegId:"11C20404"}],
+  "강원도":[{n:"강릉시",la:37.7519,lo:128.8761,midRegId:"11D20501"},{n:"동해시",la:37.5245,lo:129.1140,midRegId:"11D20501"},{n:"속초시",la:38.2070,lo:128.5918,midRegId:"11D20401"},{n:"원주시",la:37.3422,lo:127.9203,midRegId:"11D10301"},{n:"춘천시",la:37.8813,lo:127.7298,midRegId:"11D10101"},{n:"태백시",la:37.1651,lo:128.9853,midRegId:"11D20601"}],
+  "충청북도":[{n:"제천시",la:37.1326,lo:128.1909,midRegId:"11C10301"},{n:"청주시",la:36.6424,lo:127.4890,midRegId:"11C10101"},{n:"충주시",la:36.9910,lo:127.9259,midRegId:"11C10201"}],
+  "충청남도":[{n:"공주시",la:36.4465,lo:127.1191,midRegId:"11C20101"},{n:"당진시",la:36.8899,lo:126.6456,midRegId:"11C20101"},{n:"논산시",la:36.1871,lo:127.0991,midRegId:"11C20101"},{n:"보령시",la:36.3333,lo:126.6128,midRegId:"11C20101"},{n:"서산시",la:36.7849,lo:126.4503,midRegId:"11C20101"},{n:"아산시",la:36.7898,lo:127.0017,midRegId:"11C20101"},{n:"천안시",la:36.8151,lo:127.1139,midRegId:"11C20101"}],
+  "전라북도":[{n:"군산시",la:35.9676,lo:126.7368,midRegId:"11F10201"},{n:"김제시",la:35.8033,lo:126.8809,midRegId:"11F10201"},{n:"남원시",la:35.4164,lo:127.3908,midRegId:"11F10201"},{n:"익산시",la:35.9483,lo:126.9579,midRegId:"11F10201"},{n:"전주시",la:35.8242,lo:127.1480,midRegId:"11F10201"},{n:"정읍시",la:35.5699,lo:126.8559,midRegId:"11F10201"}],
+  "전라남도":[{n:"광양시",la:34.9407,lo:127.6956,midRegId:"11F20401"},{n:"나주시",la:35.0160,lo:126.7109,midRegId:"11F20401"},{n:"목포시",la:34.8118,lo:126.3922,midRegId:"11F20401"},{n:"순천시",la:34.9506,lo:127.4875,midRegId:"11F20401"},{n:"여수시",la:34.7604,lo:127.6622,midRegId:"11F20401"}],
+  "경상북도":[{n:"경주시",la:35.8562,lo:129.2247,midRegId:"11H10201"},{n:"구미시",la:36.1196,lo:128.3446,midRegId:"11H10201"},{n:"김천시",la:36.1398,lo:128.1137,midRegId:"11H10201"},{n:"안동시",la:36.5684,lo:128.7294,midRegId:"11H10201"},{n:"영주시",la:36.8057,lo:128.6239,midRegId:"11H10201"},{n:"포항시",la:36.0190,lo:129.3435,midRegId:"11H10201"}],
+  "경상남도":[{n:"거제시",la:34.8804,lo:128.6211,midRegId:"11H20301"},{n:"김해시",la:35.2285,lo:128.8892,midRegId:"11H20301"},{n:"밀양시",la:35.5036,lo:128.7463,midRegId:"11H20301"},{n:"사천시",la:34.9401,lo:128.0639,midRegId:"11H20301"},{n:"양산시",la:35.3350,lo:129.0373,midRegId:"11H20301"},{n:"진주시",la:35.1800,lo:128.1076,midRegId:"11H20301"},{n:"창원시",la:35.2281,lo:128.6811,midRegId:"11H20301"},{n:"통영시",la:34.8544,lo:128.4332,midRegId:"11H20301"}],
+  "제주":[{n:"서귀포시",la:33.2541,lo:126.5600,midRegId:"11G00201"},{n:"제주시",la:33.4996,lo:126.5312,midRegId:"11G00101"}]
 };
 
 const MAT={
@@ -190,9 +196,7 @@ const SAFE_OK=[
   "함께 지키는 안전, 함께 누리는 보람 — 기찬시설관리(주) 💪"
 ];
 
-const API_KEY = 'kC7sOQdfQ-Ou7DkHX4PjSQ';
-
-// ── 위경도 → 기상청 격자(nx,ny) 변환 ────────────────────────────────
+// ── 헬퍼 ─────────────────────────────────────────────────────────────
 function toGrid(lat,lon){
   const D=Math.PI/180,RE=6371.00877,GRID=5,
     s1=30*D,s2=60*D,olon=126*D,olat=38*D,XO=43,YO=136,re=RE/GRID;
@@ -207,18 +211,27 @@ function toGrid(lat,lon){
   return{nx:Math.floor(ra*Math.sin(theta)+XO+.5),ny:Math.floor(ro-ra*Math.cos(theta)+YO+.5)};
 }
 
-// ── 기상청 단기예보 발표 시각 계산 ───────────────────────────────────
 function getBaseTime(){
-  const now=new Date();
-  const BT=[2,5,8,11,14,17,20,23];
+  const now=new Date(),BT=[2,5,8,11,14,17,20,23];
   const cur=now.getHours()*60+now.getMinutes();
   let bh=23,bd=new Date(now),found=false;
-  for(let i=BT.length-1;i>=0;i--){
-    if(cur>=BT[i]*60+10){bh=BT[i];found=true;break;}
-  }
+  for(let i=BT.length-1;i>=0;i--){if(cur>=BT[i]*60+10){bh=BT[i];found=true;break;}}
   if(!found){bd.setDate(bd.getDate()-1);bh=23;}
   const y=bd.getFullYear(),m=String(bd.getMonth()+1).padStart(2,'0'),d=String(bd.getDate()).padStart(2,'0');
   return{base_date:`${y}${m}${d}`,base_time:String(bh).padStart(2,'0')+'00'};
+}
+
+function getMidTmFc(){
+  // 중기예보 발표시각: 06:00, 18:00
+  const now=new Date();
+  const h=now.getHours();
+  const y=now.getFullYear(),m=String(now.getMonth()+1).padStart(2,'0'),d=String(now.getDate()).padStart(2,'0');
+  if(h>=18) return `${y}${m}${d}1800`;
+  if(h>=6)  return `${y}${m}${d}0600`;
+  // 전날 18시
+  const yd=new Date(now); yd.setDate(yd.getDate()-1);
+  const yy=yd.getFullYear(),ym=String(yd.getMonth()+1).padStart(2,'0'),ydd=String(yd.getDate()).padStart(2,'0');
+  return `${yy}${ym}${ydd}1800`;
 }
 
 function dateStr(off){
@@ -232,21 +245,16 @@ function calcDew(t,rh){
 }
 const hh=h=>`${String(Math.max(0,Math.min(23,h))).padStart(2,'0')}:00`;
 
-// ── 기상청 API 호출 ──────────────────────────────────────────────────
-async function fetchWeather(lat,lon,dayOff){
-  const{nx,ny}=toGrid(lat,lon);
+// ── API 호출 ──────────────────────────────────────────────────────────
+async function fetchShort(la,lo,dayOff){
+  const{nx,ny}=toGrid(la,lo);
   const{base_date,base_time}=getBaseTime();
-  // Vercel 서버 함수 경유 (기상청 API CORS 우회)
-  const url=`/api/weather?nx=${nx}&ny=${ny}&base_date=${base_date}&base_time=${base_time}`;
-  const res=await fetch(url);
-  if(!res.ok)throw new Error(`기상청 서버 오류 ${res.status}`);
-  const data=await res.json();
-  const rc=data.response?.header?.resultCode;
-  if(rc!=='00')throw new Error(`기상청 오류: ${data.response?.header?.resultMsg||rc}`);
+  const r=await fetch(`/api/weather?type=short&nx=${nx}&ny=${ny}&base_date=${base_date}&base_time=${base_time}`);
+  if(!r.ok)throw new Error(`단기예보 오류 ${r.status}`);
+  const data=await r.json();
+  if(data.response?.header?.resultCode!=='00')throw new Error(`기상청: ${data.response?.header?.resultMsg}`);
 
   const items=data.response.body.items.item;
-
-  // 날짜+시각별 그룹화
   const grp={};
   for(const it of items){
     const k=`${it.fcstDate}_${it.fcstTime}`;
@@ -258,28 +266,23 @@ async function fetchWeather(lat,lon,dayOff){
   const tgtDate=dateStr(dayOff);
   const tmrDate=dateStr(1);
 
-  // 하루 데이터 파싱
   function parseDay(dstr,fromH){
     const slots=Object.values(grp).filter(d=>d.date===dstr).sort((a,b)=>a.time.localeCompare(b.time));
     let lastPop=0;
     return slots.map(d=>{
       const h=parseInt(d.time.substring(0,2));
-      const t=parseFloat(d.TMP??20);
-      const rh=parseInt(d.REH??70);
+      const t=parseFloat(d.TMP??20),rh=parseInt(d.REH??70);
       if(d.POP!==undefined)lastPop=parseInt(d.POP);
       let rain=0;
-      if(d.PCP&&d.PCP!=='강수없음'&&d.PCP!=='0'){
-        const v=parseFloat(d.PCP);if(!isNaN(v))rain=v;
-      }
+      if(d.PCP&&d.PCP!=='강수없음'&&d.PCP!=='0'){const v=parseFloat(d.PCP);if(!isNaN(v))rain=v;}
       return{h,t,rh,p:lastPop,rain,dew:calcDew(t,rh)};
     }).filter(s=>s.h>=fromH);
   }
 
   const hourly=parseDay(tgtDate,nowH);
   const cur=hourly[0]||{t:20,rh:70,p:0,rain:0};
-  const current={temp:cur.t,humidity:cur.rh,precipProb:cur.p,dew:calcDew(cur.t,cur.rh)};
 
-  // 내일 최고 강수확률 (오늘 탭 보양 경고용)
+  // 내일 보양 경고
   let tmrMaxProb=0,tmrLabel='';
   if(dayOff===0){
     const tmrH=parseDay(tmrDate,0);
@@ -288,7 +291,47 @@ async function fetchWeather(lat,lon,dayOff){
     tmrLabel=td.toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'});
   }
 
-  return{current,hourly,nowH,tmrMaxProb,tmrLabel};
+  return{
+    current:{temp:cur.t,humidity:cur.rh,precipProb:cur.p,dew:calcDew(cur.t,cur.rh)},
+    hourly,nowH,tmrMaxProb,tmrLabel,isMid:false
+  };
+}
+
+async function fetchMid(regId,dayOff){
+  const tmFc=getMidTmFc();
+  const[landRes,tempRes]=await Promise.all([
+    fetch(`/api/weather?type=mid_land&regId=${regId}&tmFc=${tmFc}`),
+    fetch(`/api/weather?type=mid_temp&regId=${regId}&tmFc=${tmFc}`)
+  ]);
+  const[land,temp]=await Promise.all([landRes.json(),tempRes.json()]);
+
+  const li=land.response?.body?.items?.item?.[0];
+  const ti=temp.response?.body?.items?.item?.[0];
+  if(!li||!ti)throw new Error('중기예보 데이터 없음');
+
+  // dayOff 4~10 → 기상청 필드명: rnSt4Am/rnSt4Pm, taMin4, taMax4 등
+  const d=dayOff;
+  const amPop=parseInt(li[`rnSt${d}Am`]??li[`rnSt${d}`]??0);
+  const pmPop=parseInt(li[`rnSt${d}Pm`]??li[`rnSt${d}`]??0);
+  const maxPop=Math.max(amPop,pmPop);
+  const minT=parseFloat(ti[`taMin${d}`]??ti[`taMin${d}Low`]??10);
+  const maxT=parseFloat(ti[`taMax${d}`]??ti[`taMax${d}High`]??20);
+  const avgT=(minT+maxT)/2;
+  const avgRh=70;
+
+  // 간단한 시간별 구성 (am/pm 구분)
+  const hourly=[];
+  for(let h=0;h<=23;h++){
+    const pop=h<12?amPop:pmPop;
+    hourly.push({h,t:h<12?minT+(avgT-minT)*(h/12):avgT+(maxT-avgT)*((h-12)/12),rh:avgRh,p:pop,rain:pop>=50?1:0,dew:calcDew(avgT,avgRh)});
+  }
+
+  return{
+    current:{temp:avgT,humidity:avgRh,precipProb:maxPop,dew:calcDew(avgT,avgRh)},
+    hourly,nowH:0,tmrMaxProb:0,tmrLabel:'',isMid:true,
+    amPop,pmPop,minT,maxT,
+    wf:li[`wf${d}Am`]||li[`wf${d}`]||''
+  };
 }
 
 // ── 판정 ─────────────────────────────────────────────────────────────
@@ -298,6 +341,10 @@ function getJudge(p){
   return{bg:'#b91c1c',label:'🚫 시공 취소',sub:'보양 집중 관리'};
 }
 function findDew(hourly,nowH,buf){
+  // 새벽~오전 중 이슬 존재 여부 확인
+  const earlyH=hourly.filter(s=>s.h>=0&&s.h<=10);
+  const hasDew=earlyH.some(s=>s.t<=s.dew+3);
+  if(!hasDew)return null;
   for(const s of hourly){if(s.h<nowH)continue;if(s.t>s.dew+3)return{dryH:s.h,startH:Math.min(23,s.h+Math.ceil(buf/60))};}
   return null;
 }
@@ -314,12 +361,18 @@ function render(wx){
   const cfg=MAT[ST.mat],cur=wx.current;
   const maxP=wx.hourly.length?Math.max(...wx.hourly.map(s=>s.p)):cur.precipProb;
   const jud=getJudge(maxP);
-  const isDewOk=cur.temp>cur.dew+3;
+  const isDewOk=!findDew(wx.hourly,wx.nowH,cfg.buf);
   const isHumOk=cur.humidity<cfg.hLim;
   const heat=cur.temp>=33;
   const dewInfo=!isDewOk?findDew(wx.hourly,wx.nowH,cfg.buf):null;
   const rainInfo=findRain(wx.hourly,wx.nowH);
   const noWarn=![heat,!isDewOk,!isHumOk,!!rainInfo].some(Boolean);
+
+  // 중기예보 안내
+  const mn=document.getElementById('midnotice');
+  if(wx.isMid){
+    mn.innerHTML=`<div class="midnotice">📅 중기예보 (4~10일) — 오전 강수확률 ${wx.amPop}% / 오후 ${wx.pmPop}% · 기온 ${wx.minT?.toFixed(0)}~${wx.maxT?.toFixed(0)}°C${wx.wf?` · ${wx.wf}`:''}<br><small style="opacity:.7">※ 중기예보는 단기예보보다 오차가 클 수 있습니다</small></div>`;
+  } else { mn.innerHTML=''; }
 
   // 배너
   document.getElementById('banner').style.background=jud.bg;
@@ -331,14 +384,14 @@ function render(wx){
   // 내일 보양 경고
   const tw=document.getElementById('tmrwarn');
   if(ST.dayOff===0&&wx.tmrMaxProb>=50){
-    tw.innerHTML=`<div class="tmrwarn"><div class="tw1">🚨 내일 ${wx.tmrLabel} 강수확률 ${wx.tmrMaxProb}% — ${wx.tmrMaxProb>=50?'시공 취소':'오전만 작업'} 예보</div><div class="tw2">오늘 중 보양재 덮개 완료 및 자재·장비 정리 필요</div></div>`;
+    tw.innerHTML=`<div class="tmrwarn"><div class="tw1">🚨 내일 ${wx.tmrLabel} 강수확률 ${wx.tmrMaxProb}% — 시공 취소 예보</div><div class="tw2">오늘 중 보양재 덮개 완료 및 자재·장비 정리 필요</div></div>`;
   } else { tw.innerHTML=''; }
 
   // 이슬
   const dEl=document.getElementById('dewinfo');
-  if(isDewOk) dEl.innerHTML=`<div class="tok">이슬 없음 — 즉시 시공</div>`;
+  if(isDewOk) dEl.innerHTML=`<div class="tok">이슬 조건 없음 — 시공 가능</div>`;
   else if(dewInfo) dEl.innerHTML=`<div class="twarn">${hh(dewInfo.dryH)} 건조 예상<br><span class="tstart">${hh(dewInfo.startH)} 시공 시작</span></div>`;
-  else dEl.innerHTML=`<div class="twarn">건조 시점 미확인 — 직접 확인</div>`;
+  else dEl.innerHTML=`<div class="twarn">이슬 주의 — 표면 직접 확인 필요</div>`;
 
   // 강수
   const rEl=document.getElementById('raininfo');
@@ -352,13 +405,19 @@ function render(wx){
       <div class="rtable"><div class="rtitle">시간당 강수량</div>${rows}${tot}</div>`;
   }
 
-  // 기상 데이터
-  document.getElementById('metrics').innerHTML=[
+  // 기상
+  const midMetrics=wx.isMid?[
+    {icon:'🌡',label:'최저기온', val:`${wx.minT?.toFixed(1)}°C`,warn:false},
+    {icon:'🌡',label:'최고기온', val:`${wx.maxT?.toFixed(1)}°C`,warn:wx.maxT>=33},
+    {icon:'🌧',label:'오전 강수확률',val:`${wx.amPop}%`,warn:wx.amPop>=50},
+    {icon:'🌧',label:'오후 강수확률',val:`${wx.pmPop}%`,warn:wx.pmPop>=50},
+  ]:[
     {icon:'🌡',label:'기온',   val:`${cur.temp?.toFixed(1)}°C`, warn:heat},
     {icon:'💦',label:'습도',   val:`${cur.humidity}%`,          warn:!isHumOk,sub:`기준 ${cfg.hLim}%`},
     {icon:'🌫',label:'이슬점', val:`${cur.dew?.toFixed(1)}°C`,  warn:!isDewOk},
     {icon:'🌧',label:'강수확률',val:`${cur.precipProb}%`,         warn:cur.precipProb>=50}
-  ].map(m=>`<div class="mrow"><div class="mlabel">${m.icon} ${m.label}${m.sub?`<span class="msub">(${m.sub})</span>`:''}</div><div class="mval${m.warn?' w':''}">${m.val}</div></div>`).join('');
+  ];
+  document.getElementById('metrics').innerHTML=midMetrics.map(m=>`<div class="mrow"><div class="mlabel">${m.icon} ${m.label}${m.sub?`<span class="msub">(${m.sub})</span>`:''}</div><div class="mval${m.warn?' w':''}">${m.val}</div></div>`).join('');
 
   // 안전
   const sEl=document.getElementById('safety');
@@ -382,13 +441,21 @@ function render(wx){
   }
   ST.prevP=cur.precipProb;
 
+  // 출처 배지
+  const badge=document.getElementById('srcbadge');
+  badge.textContent=wx.isMid?'기상청 중기예보':'기상청 단기예보';
+  badge.className='sbadge '+(wx.isMid?'badge-mid':'badge-short');
+
   show('result');
   document.getElementById('lupd').textContent='갱신 '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
 }
 
-// ── 유틸 ─────────────────────────────────────────────────────────────
+// ── UI ───────────────────────────────────────────────────────────────
 function show(id){['loading','errbox','result','empty'].forEach(x=>document.getElementById(x).style.display=x===id?'block':'none');}
-function setStep(i){['d0','d1','d2'].forEach((id,j)=>document.getElementById(id).className='dot'+(j<=i?' on':''));document.getElementById('steptxt').textContent=['기상청 서버 접속 중…','격자 데이터 수신 중…','시공 판단 계산 중…'][Math.min(i,2)];}
+function setStep(i){
+  ['d0','d1','d2'].forEach((id,j)=>document.getElementById(id).className='dot'+(j<=i?' on':''));
+  document.getElementById('steptxt').textContent=['기상청 서버 접속 중…','데이터 수신 중…','시공 판단 계산 중…'][Math.min(i,2)];
+}
 
 const ST={region:'서울',distIdx:6,mat:'none',dayOff:0,prevP:null,flashT:null,_s:0};
 
@@ -398,7 +465,12 @@ async function doLoad(){
   const si=setInterval(()=>{ST._s=Math.min((ST._s||0)+1,2);setStep(ST._s);},3000);
   try{
     ST._s=0;
-    const wx=await fetchWeather(dist.la,dist.lo,ST.dayOff);
+    let wx;
+    if(ST.dayOff<=2){
+      wx=await fetchShort(dist.la,dist.lo,ST.dayOff);
+    } else {
+      wx=await fetchMid(dist.midRegId,ST.dayOff);
+    }
     render(wx);
   }catch(e){
     document.getElementById('errmsg').textContent=e.message;
@@ -406,19 +478,20 @@ async function doLoad(){
   }finally{clearInterval(si);ST._s=0;}
 }
 
-// ── 초기화 ────────────────────────────────────────────────────────────
 function initDays(){
   const w=document.getElementById('dtabs');w.innerHTML='';
-  // 단기예보는 3일(오늘/내일/모레)
-  ['오늘','내일','모레'].forEach((lab,i)=>{
+  const labels=['오늘','내일','모레'];
+  for(let i=0;i<=9;i++){
     const d=new Date();d.setDate(d.getDate()+i);
+    const lab=labels[i]||`${i+1}일후`;
     const md=d.toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'});
     const b=document.createElement('button');
-    b.className='dbtn'+(i===ST.dayOff?' on':'');
+    const isMid=i>=3;
+    b.className=`dbtn${isMid?' mid':''}${i===ST.dayOff?' on':''}`;
     b.innerHTML=`${lab} <span style="font-weight:400;opacity:.8">${md}</span>`;
-    b.onclick=()=>{ST.dayOff=i;document.querySelectorAll('.dbtn').forEach((x,j)=>x.className='dbtn'+(j===i?' on':''));show('empty');doLoad();};
+    b.onclick=()=>{ST.dayOff=i;document.querySelectorAll('.dbtn').forEach((x,j)=>{const m=j>=3;x.className=`dbtn${m?' mid':''}${j===i?' on':''}`;});show('empty');doLoad();};
     w.appendChild(b);
-  });
+  }
 }
 
 function initReg(){
@@ -439,11 +512,10 @@ function initDist(){
 function updLoc(){
   const dist=(LOC[ST.region]||[])[ST.distIdx];if(!dist)return;
   const d=new Date();d.setDate(d.getDate()+ST.dayOff);
-  const fd=d.toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'short'});
-  document.getElementById('locinfo').innerHTML=`📍 ${ST.region} ${dist.n} · <strong>${fd}</strong>`;
+  document.getElementById('locinfo').innerHTML=`📍 ${ST.region} ${dist.n} · <strong>${d.toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'short'})}</strong>`;
 }
 
-document.getElementById('smat').onchange=e=>{ST.mat=e.target.value;};
+document.getElementById('smat').onchange=e=>ST.mat=e.target.value;
 setInterval(()=>document.getElementById('clock').textContent=new Date().toLocaleTimeString('ko-KR'),1000);
 document.getElementById('clock').textContent=new Date().toLocaleTimeString('ko-KR');
 setInterval(doLoad,10*60*1000);
