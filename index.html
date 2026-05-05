@@ -372,24 +372,25 @@ async function fetchMid(regId,dayOff){
   const landUrl=`/api/weather?type=mid_land&regId=${regId}&tmFc=${tmFc}`;
   const tempUrl=`/api/weather?type=mid_temp&regId=${regId}&tmFc=${tmFc}`;
   const[landRes,tempRes]=await Promise.all([fetch(landUrl),fetch(tempUrl)]);
-
-  // HTTP 오류 즉시 표면화
-  if(!landRes.ok)throw new Error(`중기육상예보 HTTP ${landRes.status} — /api/weather 함수 점검 필요`);
-  if(!tempRes.ok)throw new Error(`중기기온예보 HTTP ${tempRes.status} — /api/weather 함수 점검 필요`);
-
   const[land,temp]=await Promise.all([landRes.json(),tempRes.json()]);
 
-  // KMA 응답코드 확인 (00 = 정상)
-  const lCode=land.response?.header?.resultCode;
-  const tCode=temp.response?.header?.resultCode;
-  const lMsg=land.response?.header?.resultMsg||'NO_RESPONSE';
-  const tMsg=temp.response?.header?.resultMsg||'NO_RESPONSE';
+  // KMA OpenAPI 에러(서비스키 미등록·한도초과 등) 감지 — weather.js가 그대로 전달
+  const kmaErr=(d)=>{
+    if(d?.OpenAPI_ServiceResponse){
+      const h=d.OpenAPI_ServiceResponse.cmmMsgHeader||{};
+      return `${h.errMsg||h.returnAuthMsg||'KMA 에러'}${h.returnReasonCode?'('+h.returnReasonCode+')':''}`;
+    }
+    const rc=d?.response?.header?.resultCode;
+    if(rc&&rc!=='00')return `KMA(${rc}): ${d.response.header.resultMsg||''}`;
+    return null;
+  };
+  const lErr=kmaErr(land), tErr=kmaErr(temp);
 
   let li=land.response?.body?.items?.item?.[0];
   let ti=temp.response?.body?.items?.item?.[0];
 
-  // 최신 발표 데이터가 아직 미생성 시 → 이전 발표시각으로 재시도
-  if(!li||!ti){
+  // 에러도 없고 데이터도 없으면 → 이전 발표시각 재시도 (발표 직후 미생성 케이스)
+  if((!li||!ti)&&!lErr&&!tErr){
     const prevTmFc=getPrevMidTmFc();
     const[land2,temp2]=await Promise.all([
       !li?fetch(`/api/weather?type=mid_land&regId=${regId}&tmFc=${prevTmFc}`).then(r=>r.json()):Promise.resolve(land),
@@ -399,9 +400,13 @@ async function fetchMid(regId,dayOff){
     if(!ti)ti=temp2.response?.body?.items?.item?.[0];
   }
 
-  if(!li&&!ti)throw new Error(`중기예보 양쪽 모두 응답 없음 — Vercel /api/weather 함수에 mid_land/mid_temp 분기 미구현 의심 (육상:${lCode||'?'} 기온:${tCode||'?'})`);
-  if(!li)throw new Error(`중기육상예보 데이터 없음 (응답코드:${lCode||'?'} / ${lMsg})`);
-  if(!ti)throw new Error(`중기기온예보 데이터 없음 (응답코드:${tCode||'?'} / ${tMsg})`);
+  // KMA 에러 메시지 우선 표시
+  if(lErr&&tErr)throw new Error(`중기예보 실패 — ${lErr}`);
+  if(lErr)throw new Error(`중기육상예보 — ${lErr}`);
+  if(tErr)throw new Error(`중기기온예보 — ${tErr}`);
+  if(!li&&!ti)throw new Error(`중기예보 양쪽 응답 없음 (지역코드: ${regId}, tmFc: ${tmFc})`);
+  if(!li)throw new Error(`중기육상예보 데이터 없음 (지역코드: ${regId})`);
+  if(!ti)throw new Error(`중기기온예보 데이터 없음 (지역코드: ${regId})`);
 
   const d=dayOff;
   const amPop=parseInt(li[`rnSt${d}Am`]??li[`rnSt${d}`]??0);
