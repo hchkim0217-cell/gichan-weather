@@ -374,11 +374,15 @@ async function fetchMid(regId,dayOff){
   const[landRes,tempRes]=await Promise.all([fetch(landUrl),fetch(tempUrl)]);
   const[land,temp]=await Promise.all([landRes.json(),tempRes.json()]);
 
-  // KMA OpenAPI 에러(서비스키 미등록·한도초과 등) 감지 — weather.js가 그대로 전달
+  // KMA OpenAPI 에러(서비스키 미등록·한도초과·활용신청 필요 등) 감지
   const kmaErr=(d)=>{
     if(d?.OpenAPI_ServiceResponse){
       const h=d.OpenAPI_ServiceResponse.cmmMsgHeader||{};
       return `${h.errMsg||h.returnAuthMsg||'KMA 에러'}${h.returnReasonCode?'('+h.returnReasonCode+')':''}`;
+    }
+    // apihub.kma.go.kr 신형 에러: {result:{status,message}}
+    if(d?.result?.status&&d.result.status!==200){
+      return `KMA ${d.result.status}: ${d.result.message||''}`;
     }
     const rc=d?.response?.header?.resultCode;
     if(rc&&rc!=='00')return `KMA(${rc}): ${d.response.header.resultMsg||''}`;
@@ -633,7 +637,7 @@ function initDays(){
     const b=document.createElement('button');
     const isMid=i>=3;
     b.className=`dbtn${isMid?' mid':''}${i===ST.dayOff?' on':''}`;
-    b.innerHTML=`${lab} <span style="font-weight:400;opacity:.8">${md}</span>`;
+    b.innerHTML = isMid ? md : `${lab} <span style="font-weight:400;opacity:.8">${md}</span>`;
     b.onclick=()=>{ST.dayOff=i;document.querySelectorAll('.dbtn').forEach((x,j)=>{const m=j>=3;x.className=`dbtn${m?' mid':''}${j===i?' on':''}`;});show('empty');doLoad();};
     w.appendChild(b);
   }
