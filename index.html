@@ -331,16 +331,18 @@ async function fetchShort(la,lo,dayOff){
 
       // 초단기예보 데이터 존재 여부 (해당 시간에 초단기 데이터 있으면 더 정확)
       const isUltra = u && u.T1H !== undefined;
-      // PTY: 초단기예보만 사용 (단기예보 PTY는 시간 오차 발생시킴)
-      const pty = isUltra ? parseInt(u.PTY??0) : 0;
+      // PTY: 초단기예보 우선, 없으면 단기예보 PTY 사용 (날씨누리 강수 아이콘과 동일 기준)
+      const pty = isUltra ? parseInt(u.PTY??0) : parseInt(d.PTY??0);
       let rain=0;
       if(u?.RN1!==undefined && u.RN1!=='강수없음'){
         const v=parseFloat(u.RN1); if(!isNaN(v)) rain=v;
       } else if(d.PCP && d.PCP!=='강수없음' && d.PCP!=='0'){
-        const v=parseFloat(d.PCP); if(!isNaN(v)) rain=v;
+        // "1mm 미만"은 0.5mm로 처리 (parseFloat 시 1로 잡혀 과대 표시되는 문제 방지)
+        if(d.PCP.includes('미만')) rain=0.5;
+        else { const v=parseFloat(d.PCP); if(!isNaN(v)) rain=v; }
       }
-      // 초단기예보 PTY>0이면 확실한 비 → 확률 반영, 단기예보는 POP만 사용
-      const effectiveP = (isUltra && pty>0) ? Math.max(lastPop,70) : lastPop;
+      // PTY>0 (실제 비 예보) 시 POP 보정 — 단기·초단기 공통 적용
+      const effectiveP = pty>0 ? Math.max(lastPop,70) : lastPop;
 
       return{h,t,rh,p:effectiveP,rain,pty,dew:calcDew(t,rh)};
     }).filter(s=>s.h>=fromH);
@@ -367,11 +369,21 @@ async function fetchShort(la,lo,dayOff){
 
 async function fetchMid(regId,dayOff){
   const tmFc=getMidTmFc();
-  const[landRes,tempRes]=await Promise.all([
-    fetch(`/api/weather?type=mid_land&regId=${regId}&tmFc=${tmFc}`),
-    fetch(`/api/weather?type=mid_temp&regId=${regId}&tmFc=${tmFc}`)
-  ]);
+  const landUrl=`/api/weather?type=mid_land&regId=${regId}&tmFc=${tmFc}`;
+  const tempUrl=`/api/weather?type=mid_temp&regId=${regId}&tmFc=${tmFc}`;
+  const[landRes,tempRes]=await Promise.all([fetch(landUrl),fetch(tempUrl)]);
+
+  // HTTP 오류 즉시 표면화
+  if(!landRes.ok)throw new Error(`중기육상예보 HTTP ${landRes.status} — /api/weather 함수 점검 필요`);
+  if(!tempRes.ok)throw new Error(`중기기온예보 HTTP ${tempRes.status} — /api/weather 함수 점검 필요`);
+
   const[land,temp]=await Promise.all([landRes.json(),tempRes.json()]);
+
+  // KMA 응답코드 확인 (00 = 정상)
+  const lCode=land.response?.header?.resultCode;
+  const tCode=temp.response?.header?.resultCode;
+  const lMsg=land.response?.header?.resultMsg||'NO_RESPONSE';
+  const tMsg=temp.response?.header?.resultMsg||'NO_RESPONSE';
 
   let li=land.response?.body?.items?.item?.[0];
   let ti=temp.response?.body?.items?.item?.[0];
@@ -387,7 +399,9 @@ async function fetchMid(regId,dayOff){
     if(!ti)ti=temp2.response?.body?.items?.item?.[0];
   }
 
-  if(!li||!ti)throw new Error(`중기예보 데이터 없음 (지역코드: ${regId})`);
+  if(!li&&!ti)throw new Error(`중기예보 양쪽 모두 응답 없음 — Vercel /api/weather 함수에 mid_land/mid_temp 분기 미구현 의심 (육상:${lCode||'?'} 기온:${tCode||'?'})`);
+  if(!li)throw new Error(`중기육상예보 데이터 없음 (응답코드:${lCode||'?'} / ${lMsg})`);
+  if(!ti)throw new Error(`중기기온예보 데이터 없음 (응답코드:${tCode||'?'} / ${tMsg})`);
 
   const d=dayOff;
   const amPop=parseInt(li[`rnSt${d}Am`]??li[`rnSt${d}`]??0);
@@ -445,8 +459,8 @@ function findDew(hourly,nowH,buf){
 }
 
 function findRain(hourly,nowH){
-  // 강수확률 50% 이상 시간대 = 날씨누리와 동일 기준
-  const sl=hourly.filter(s=>s.h>nowH && s.p>=50);
+  // 실제 강수 예보 시간대 (PTY>0 또는 강수량>0) — 날씨누리 강수 아이콘과 동일 기준
+  const sl=hourly.filter(s=>s.h>nowH && (s.pty>0 || s.rain>0));
   if(!sl.length)return null;
   const sH=sl[0].h, eH=sl[sl.length-1].h;
   const am=sl.map(s=>({h:s.h,mm:+s.rain.toFixed(1)}));
