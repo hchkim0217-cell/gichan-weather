@@ -236,12 +236,8 @@ const hh=h=>`${String(Math.max(0,Math.min(23,h))).padStart(2,'0')}:00`;
 async function fetchWeather(lat,lon,dayOff){
   const{nx,ny}=toGrid(lat,lon);
   const{base_date,base_time}=getBaseTime();
-  const kmaUrl=`https://apihub.kma.go.kr/api/typ02/openApi/VilageFcstInfoService_2.0/getVilageFcst`+
-    `?pageNo=1&numOfRows=1000&dataType=JSON&base_date=${base_date}&base_time=${base_time}`+
-    `&nx=${nx}&ny=${ny}&authKey=${encodeURIComponent(API_KEY)}`;
-
-  // CORS 프록시 경유 (기상청 API는 직접 브라우저 호출 차단)
-  const url=`https://corsproxy.io/?${encodeURIComponent(kmaUrl)}`;
+  // Vercel 서버 함수 경유 (기상청 API CORS 우회)
+  const url=`/api/weather?nx=${nx}&ny=${ny}&base_date=${base_date}&base_time=${base_time}`;
   const res=await fetch(url);
   if(!res.ok)throw new Error(`기상청 서버 오류 ${res.status}`);
   const data=await res.json();
