@@ -332,7 +332,9 @@ function findRainPeriod(hourly,nowH){
 function render(wx){
   const cfg=MAT[state.mat];
   const cur=wx.current;
-  const jud=getJudge(cur.precipProb);
+  // 하루 중 최고 강수확률로 판정 (현재 시간 이후 전체)
+  const maxProb=wx.hourly.length>0 ? Math.max(...wx.hourly.map(s=>s.p)) : cur.precipProb;
+  const jud=getJudge(maxProb);
   const isDewOk=cur.temp>cur.dew+3;
   const isHumOk=cur.humidity<cfg.hLim;
   const heat=cur.temp>=33;
@@ -344,7 +346,10 @@ function render(wx){
   const banner=document.getElementById("banner");
   banner.style.background=jud.bg;
   document.getElementById("b-label").textContent=jud.label;
-  document.getElementById("b-sub").textContent=`강수확률 ${cur.precipProb}% · ${jud.sub}`;
+  const probTxt=maxProb!==cur.precipProb
+    ? `현재 ${cur.precipProb}% / 최고 ${maxProb}% · ${jud.sub}`
+    : `강수확률 ${cur.precipProb}% · ${jud.sub}`;
+  document.getElementById("b-sub").textContent=probTxt;
 
   // 이슬
   const dewEl=document.getElementById("dew-info");
