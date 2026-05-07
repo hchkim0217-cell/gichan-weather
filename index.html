@@ -1,25 +1,252 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="기찬날씨">
+<meta name="theme-color" content="#1e3a5f">
+<title>기찬시설관리(주) — 현장 시공·안전 통합 관리</title>
+<style>
+/* 기존 현철 님의 깔끔한 디자인 스타일 유지 */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-height:100vh}
+select,button{font-family:inherit;cursor:pointer}
+select{background:#fff;color:#111;border:1px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px}
+.card{background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.07);padding:14px}
+@keyframes spin{to{transform:rotate(360deg)}}
+header{background:#1e3a5f;color:#fff;padding:0 16px;display:flex;align-items:center;gap:12px;height:56px;position:sticky;top:0;z-index:100}
+.logo{background:#fff;color:#1e3a5f;font-weight:900;font-size:18px;padding:2px 10px;border-radius:6px;flex-shrink:0}
+.hd{flex:1}.hd h1{font-size:14px;font-weight:700}.hd p{font-size:10px;opacity:.7}
+.hclock{text-align:right;font-size:10px;opacity:.8;flex-shrink:0}
+.hclock span{font-size:14px;font-weight:700;display:block}
+main{padding:12px;max-width:680px;margin:0 auto}
+.ctrl{margin-bottom:10px}
+.dtabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+.dbtn{padding:5px 10px;border-radius:20px;border:none;font-size:12px;font-weight:700;background:#e2e8f0;color:#64748b}
+.dbtn.on{background:#1e3a5f;color:#fff}
+.sels{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.locinfo{font-size:11px;color:#94a3b8;margin-top:7px}
+.locinfo strong{color:#0369a1}
+.loading{text-align:center;padding:32px 20px}
+.spinner{width:36px;height:36px;border:3px solid #e2e8f0;border-top:3px solid #1e3a5f;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}
+.errbox{background:#fee2e2;color:#b91c1c;padding:12px 16px;border-radius:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.banner{border-radius:14px;padding:22px 18px;text-align:center;margin-bottom:10px;color:#fff; transition: background 0.3s;}
+.blabel{font-size:38px;font-weight:900;line-height:1.1;margin-bottom:6px}
+.bsub{font-size:16px;opacity:.95;line-height:1.5}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+@media(max-width:480px){.grid2{grid-template-columns:1fr}}
+.stitle{font-size:12px;color:#1e3a5f;font-weight:900;margin-bottom:12px}
+.tok{font-size:18px;font-weight:900;color:#15803d}
+.twarn{font-size:18px;font-weight:700;color:#b91c1c}
+.mrow{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f8fafc}
+.mval{font-weight:800;color:#1e293b}
+.mval.w{color:#b91c1c}
+.empty{text-align:center;padding:48px 20px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">기찬</div>
+  <div class="hd"><h1>기찬시설관리(주)</h1><p>현장 시공·안전 통합 관리 시스템</p></div>
+  <div class="hclock"><span id="clock"></span><span id="lupd"></span></div>
+</header>
+
+<main>
+  <div class="card ctrl">
+    <div class="dtabs" id="dtabs"></div>
+    <div class="sels">
+      <select id="sreg"></select>
+      <select id="sdist"></select>
+      <select id="smat" style="margin-left:auto">
+        <option value="none">재질 선택 안 함</option>
+        <option value="urethane">옥상 우레탄</option>
+        <option value="epoxy">주차장 에폭시</option>
+        <option value="painting">외벽 도장</option>
+      </select>
+    </div>
+    <div class="locinfo" id="locinfo"></div>
+  </div>
+
+  <div class="card loading" id="loading" style="display:none">
+    <div class="spinner"></div>
+    <p id="steptxt">기상청 데이터 분석 중...</p>
+  </div>
+
+  <div class="errbox" id="errbox" style="display:none">
+    <span id="errmsg">데이터를 가져오지 못했습니다.</span>
+    <button onclick="doLoad()" style="padding:5px 10px; border-radius:5px; border:none; background:#b91c1c; color:#fff;">재시도</button>
+  </div>
+
+  <div id="result" style="display:none">
+    <div class="banner" id="banner">
+      <div class="blabel" id="blabel">데이터 분석 중</div>
+      <div class="bsub" id="bsub">잠시만 기다려 주세요.</div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="stitle">🌧 새벽 강수량 (05시까지)</div>
+        <div id="raininfo" class="tok">0.0mm</div>
+      </div>
+      <div class="card">
+        <div class="stitle">💦 현재 습도</div>
+        <div id="huminfo" class="tok">0%</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stitle">📊 상세 기상 정보</div>
+      <div id="metrics"></div>
+    </div>
+  </div>
+
+  <div class="card empty" id="empty">
+    <h2>지역을 선택해 주세요</h2>
+    <p>상단 드롭다운에서 현장 위치를 선택하면 분석이 시작됩니다.</p>
+  </div>
+</main>
+
+<script>
+// --- 데이터 및 설정 ---
+const LOC={
+  "서울":[{n:"강남구",la:37.5172,lo:127.0473},{n:"강동구",la:37.5301,lo:127.1238},{n:"서초구",la:37.4837,lo:127.0324},{n:"송파구",la:37.5145,lo:127.1059}],
+  "경기도":[{n:"시흥시(배곧)",la:37.3800,lo:126.7158},{n:"안산시",la:37.3236,lo:126.8219},{n:"부천시",la:37.5034,lo:126.7660},{n:"김포시",la:37.6154,lo:126.7158}],
+  "인천":[{n:"연수구(송도)",la:37.4099,lo:126.6780},{n:"서구",la:37.5450,lo:126.6760}]
+};
+
+const MAT={
+  none:{hLim:85, dn:"시공 전 건조 확인"},
+  urethane:{hLim:75, dn:"이슬 건조 후 90분 대기 필수"},
+  epoxy:{hLim:75, dn:"바닥 함수율 6% 미만 확인"}
+};
+
+const ST={region:'서울',distIdx:0,mat:'none',dayOff:0};
+
+// --- 헬퍼 함수 ---
+function toGrid(lat,lon){
+  const RE=6371.00877, GRID=5, SLAT1=30, SLAT2=60, OLON=126, OLAT=38, XO=43, YO=136;
+  const DEGRAD=Math.PI/180;
+  const re=RE/GRID, slat1=SLAT1*DEGRAD, slat2=SLAT2*DEGRAD, olon=OLON*DEGRAD, olat=OLAT*DEGRAD;
+  let sn=Math.log(Math.cos(slat1)/Math.cos(slat2))/Math.log(Math.tan(Math.PI*0.25+slat2*0.5)/Math.tan(Math.PI*0.25+slat1*0.5));
+  let sf=Math.pow(Math.tan(Math.PI*0.25+slat1*0.5),sn)*Math.cos(slat1)/sn;
+  let ro=re*sf/Math.pow(Math.tan(Math.PI*0.25+olat*0.5),sn);
+  let ra=re*sf/Math.pow(Math.tan(Math.PI*0.25+lat*DEGRAD*0.5),sn);
+  let theta=lon*DEGRAD-olon;
+  if(theta>Math.PI)theta-=2*Math.PI; if(theta<-Math.PI)theta+=2*Math.PI;
+  theta*=sn;
+  return{nx:Math.floor(ra*Math.sin(theta)+XO+0.5),ny:Math.floor(ro-ra*Math.cos(theta)+YO+0.5)};
+}
+
+function getBaseDateTime(){
+  const now=new Date();
+  const times=[2,5,8,11,14,17,20,23];
+  let h=now.getHours(), d=now;
+  let baseH=times.reverse().find(t=>h>=t+1)||23;
+  if(h<3) d.setDate(d.getDate()-1);
+  return{
+    date:`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`,
+    time:String(baseH).padStart(2,'0')+'00'
+  };
+}
+
+// --- 실행 로직 ---
+async function doLoad(){
+  const dist=LOC[ST.region][ST.distIdx];
+  const grid=toGrid(dist.la, dist.lo);
+  const base=getBaseDateTime();
+
+  show('loading');
+
+  try {
+    const url=`/api/weather?nx=${grid.nx}&ny=${grid.ny}&region=${ST.region+dist.n}&base_date=${base.date}&base_time=${base.time}&day_off=${ST.dayOff}`;
+    const res=await fetch(url);
+    const wx=await res.json();
+
+    if(wx.error) throw new Error(wx.error);
+    render(wx);
+  } catch(e) {
+    document.getElementById('errmsg').textContent=e.message;
+    show('errbox');
+  }
+}
+
 function render(wx) {
-  show('result'); // 즉시 결과 표시
-  
   const items = wx.items || [];
   const rainAmt = wx.rain || 0;
-  const reh = items.find(i => i.category === 'REH')?.fcstValue || 70;
-  
-  let bg = '#15803d', lbl = '정상 시공 가능', msg = '안전 수칙을 준수하세요.';
+  // 현재 습도 찾기 (가장 빠른 예보 시간의 REH 값)
+  const currentREH = items.find(i=>i.category==='REH')?.fcstValue || 70;
+  const currentTMP = items.find(i=>i.category==='TMP')?.fcstValue || 20;
 
-  // 1순위: 강수량 0.3mm (현철 님 마지노선)
+  let bg='#15803d', title='정상 시공 가능', sub='강수 및 결로 위험 낮음';
+
+  // 1. 현철 Standard: 강수량 0.3mm (주황색)
   if (rainAmt >= 0.3) {
-    bg = '#f97316'; lbl = "전일 강수량 확인";
-    msg = `새벽 5시까지 ${rainAmt}mm 비 예보. 바닥 건조 확인 필수!`;
+    bg='#f97316'; title="전일 강수량 확인";
+    sub=`내일 새벽 5시까지 누적 ${rainAmt}mm 예보. 바닥 건조 확인 후 시공 결정!`;
   } 
-  // 2순위: 습도 75% (결로 방어)
-  else if (parseInt(reh) >= 75) {
-    bg = '#b45309'; lbl = "결로/이슬 주의";
-    msg = `${wx.isSpecial ? '해안/산간 지형: ' : ''}습도 ${reh}%로 바닥이 눅눅할 수 있음.`;
+  // 2. 현철 Standard: 습도 75% (노란색/주황)
+  else if (parseInt(currentREH) >= 75) {
+    bg='#b45309'; title="결로/이슬 주의";
+    sub=`${wx.isSpecial?'특수 지형: ':''}현재 습도 ${currentREH}%로 바닥 결로 위험이 높습니다.`;
   }
 
-  const banner = document.getElementById('banner');
-  banner.style.background = bg;
-  document.getElementById('blabel').textContent = lbl;
-  document.getElementById('bsub').textContent = msg;
+  // 화면 업데이트
+  document.getElementById('banner').style.background=bg;
+  document.getElementById('blabel').textContent=title;
+  document.getElementById('bsub').textContent=sub;
+  document.getElementById('raininfo').textContent=`${rainAmt.toFixed(1)}mm`;
+  document.getElementById('raininfo').className = rainAmt >= 0.3 ? 'twarn' : 'tok';
+  document.getElementById('huminfo').textContent=`${currentREH}%`;
+  document.getElementById('huminfo').className = parseInt(currentREH) >= 75 ? 'twarn' : 'tok';
+
+  // 상세 정보 표시
+  document.getElementById('metrics').innerHTML=`
+    <div class="mrow"><span>기온</span><span class="mval">${currentTMP}°C</span></div>
+    <div class="mrow"><span>습도</span><span class="mval">${currentREH}%</span></div>
+    <div class="mrow"><span>특수지형 여부</span><span class="mval">${wx.isSpecial?'대상':'해당없음'}</span></div>
+  `;
+
+  show('result');
 }
+
+// --- UI 제어 ---
+function show(id){['loading','errbox','result','empty'].forEach(x=>document.getElementById(x).style.display=x===id?'block':'none');}
+
+function init(){
+  // 지역 설정
+  const sreg=document.getElementById('sreg');
+  sreg.innerHTML=Object.keys(LOC).map(r=>`<option>${r}</option>`).join('');
+  sreg.onchange=()=>{ ST.region=sreg.value; ST.distIdx=0; updateDist(); doLoad(); };
+  
+  updateDist();
+  
+  // 날짜 탭 (오늘/내일만 간단히)
+  const dtabs=document.getElementById('dtabs');
+  ['오늘','내일'].forEach((l,i)=>{
+    const b=document.createElement('button');
+    b.className=`dbtn ${i===0?'on':''}`;
+    b.textContent=l;
+    b.onclick=()=>{
+      ST.dayOff=i;
+      document.querySelectorAll('.dbtn').forEach((x,j)=>x.classList.toggle('on',i===j));
+      doLoad();
+    };
+    dtabs.appendChild(b);
+  });
+}
+
+function updateDist(){
+  const sdist=document.getElementById('sdist');
+  sdist.innerHTML=LOC[ST.region].map((d,i)=>`<option value="${i}">${d.n}</option>`).join('');
+  sdist.onchange=()=>{ ST.distIdx=parseInt(sdist.value); doLoad(); };
+}
+
+document.getElementById('smat').onchange=(e)=>ST.mat=e.target.value;
+setInterval(()=>document.getElementById('clock').textContent=new Date().toLocaleTimeString(),1000);
+
+init();
+</script>
+</body>
+</html>
