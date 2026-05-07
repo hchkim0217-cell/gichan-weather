@@ -1,102 +1,39 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>기찬시설관리 - 전국 현장 매니저</title>
-    <style>
-        :root { --bg: #f8fafc; --card: #ffffff; --primary: #2563eb; --danger: #f97316; --warning: #f59e0b; --success: #10b981; --text: #1e293b; }
-        body { font-family: sans-serif; background: var(--bg); color: var(--text); padding: 16px; margin: 0; }
-        .container { max-width: 500px; margin: 0 auto; }
-        .card { background: var(--card); border-radius: 16px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 16px; }
-        .status-banner { border-radius: 12px; padding: 16px; text-align: center; font-weight: 700; color: white; margin-bottom: 16px; transition: 0.3s; }
-        .tabs { display: flex; gap: 8px; margin-bottom: 16px; background: #e2e8f0; padding: 4px; border-radius: 12px; }
-        .tab { flex: 1; padding: 10px; border-radius: 8px; cursor: pointer; border: none; background: transparent; font-weight: 600; font-size: 15px; }
-        .tab.active { background: white; color: var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .loading { display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.8); flex-direction: column; align-items: center; justify-content: center; z-index: 100; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div style="display:flex; justify-content:space-between; margin-bottom:20px; align-items:center;">
-            <b style="color:var(--primary); font-size:18px;">GICHAN WEATHER</b>
-            <span id="region-display" style="font-weight:600; background:#ddd; padding:4px 10px; border-radius:20px; font-size:13px;">경기도 광명시</span>
-        </div>
+// index.html 파일 내의 render 함수 부분을 아래 내용으로 교체하세요.
 
-        <div class="tabs">
-            <button class="tab active" onclick="changeTab(0)">오늘 시공</button>
-            <button class="tab" onclick="changeTab(1)">내일 시공</button>
-        </div>
+function render(wx) {
+  const cfg = MAT[ST.mat];
+  const items = wx.items || [];
+  
+  // 1. 습도 75% 기준 및 지형 가중치 (현철 님 지시)
+  const humidLimit = 75; 
+  const currentHumi = items.find(i => i.category === 'REH')?.fcstValue || 70;
+  const highHumi = parseInt(currentHumi) >= humidLimit;
+  
+  // 2. 강수량 0.3mm 및 새벽 5시 기준 (현철 님 지시)
+  const rainAmount = wx.rain || 0;
+  
+  let color = '#15803d', title = '', sub = '';
 
-        <div id="status-box" class="status-banner">기상 데이터를 분석하고 있습니다...</div>
+  if (rainAmount >= 0.3) {
+    color = '#f97316'; // 주황색
+    title = "전일 강수량 확인"; // 현철 님 지시 문구
+    sub = `새벽 5시까지 누적 ${rainAmount}mm 예보. 바닥 상태 확인 필수.`;
+  } else if (highHumi) {
+    color = '#b45309'; // 노란색
+    title = "결로/이슬 주의";
+    sub = `${wx.isSpecial ? '지형 특성상 ' : ''}습도 ${currentHumi}%로 바닥이 눅눅할 수 있음.`;
+  } else {
+    color = '#15803d'; // 초록색
+    title = "정상 작업 가능";
+    sub = "강수 및 결로 위험 낮음. 현장 안전 수칙 준수.";
+  }
 
-        <div class="card">
-            <div style="font-weight:700; margin-bottom:12px; color:#64748b;">💧 바닥건조 & 결로 예측</div>
-            <div id="ground-status" style="line-height:1.6; font-size:15px;">전국 지형 데이터 대조 중...</div>
-        </div>
-    </div>
+  // 배너 업데이트
+  const banner = document.getElementById('banner');
+  banner.style.background = color;
+  document.getElementById('blabel').textContent = title;
+  document.getElementById('bsub').textContent = sub;
 
-    <div id="loading" class="loading"><div>전국 데이터 분석 중...</div></div>
-
-    <script>
-        const ST = { region: "경기도", dayOff: 0 };
-        const LOC = { "경기도": { name: "광명시", la: 60, lo: 121 } }; // 실제 주소 선택 로직과 연동되는 부분
-
-        function changeTab(d) {
-            ST.dayOff = d;
-            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === d));
-            doLoad();
-        }
-
-        async function doLoad() {
-            const loading = document.getElementById('loading');
-            loading.style.display = 'flex';
-            
-            const now = new Date();
-            const dateStr = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
-            const loc = LOC[ST.region] || { la: 60, lo: 121 };
-
-            try {
-                const res = await fetch(`/api/weather?type=past_rain&region=${ST.region}&nx=${loc.la}&ny=${loc.lo}&day_off=${ST.dayOff}&base_date=${dateStr}&base_time=0500`).then(r => r.json());
-                const wx = await fetch(`/api/weather?type=short&nx=${loc.la}&ny=${loc.lo}&base_date=${dateStr}&base_time=0500`).then(r => r.json());
-                
-                render(res, wx.items || []);
-            } catch (e) {
-                document.getElementById('status-box').textContent = "연결 오류 (인증키 확인 필요)";
-            } finally {
-                loading.style.display = 'none';
-            }
-        }
-
-        function render(data, items) {
-            const banner = document.getElementById('status-box');
-            const detail = document.getElementById('ground-status');
-            
-            // 습도 75% 기준 (전국 공통 강화)
-            const highHumi = items.some(i => i.category === 'REH' && parseFloat(i.fcstValue) >= 75);
-            
-            let color = '#10b981', title = '', desc = '';
-
-            if (data.rain >= 0.3) {
-                color = '#f97316'; // 주황색
-                title = "전일 강수량 확인 (주의)";
-                desc = `❗ <b>새벽 5시 기준 강수량 ${data.rain}mm</b>가 확인됩니다. 바닥이 젖어 있을 수 있으니 반드시 현장 체크 후 시공하세요.`;
-            } else if (highHumi) {
-                color = '#f59e0b'; // 노란색
-                title = "결로/이슬 주의 (바닥 눅눅함)";
-                desc = `⚠️ 비는 오지 않으나 <b>습도가 75% 이상</b>입니다. ${data.isSpecial ? '지형 특성상' : '야간 습기로 인해'} 바닥이 눅눅할 수 있습니다.`;
-            } else {
-                color = '#10b981'; // 초록색
-                title = "시공 가능성 높음";
-                desc = `✅ 강수량(${data.rain}mm) 및 습도 모두 양호합니다. 쾌적한 시공이 예상됩니다.`;
-            }
-
-            banner.textContent = title;
-            banner.style.background = color;
-            detail.innerHTML = desc;
-        }
-
-        doLoad();
-    </script>
-</body>
-</html>
+  // 나머지 기존 렌더링 로직(이슬 건조 시간 등)은 그대로 유지됩니다.
+  show('result');
+}
