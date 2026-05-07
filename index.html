@@ -8,7 +8,6 @@
 <meta name="theme-color" content="#1e3a5f">
 <title>기찬시설관리(주) — 현장 시공·안전 통합 관리</title>
 <style>
-/* 기존 현철 님의 깔끔한 디자인 스타일 유지 */
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-height:100vh}
 select,button{font-family:inherit;cursor:pointer}
@@ -31,7 +30,7 @@ main{padding:12px;max-width:680px;margin:0 auto}
 .loading{text-align:center;padding:32px 20px}
 .spinner{width:36px;height:36px;border:3px solid #e2e8f0;border-top:3px solid #1e3a5f;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}
 .errbox{background:#fee2e2;color:#b91c1c;padding:12px 16px;border-radius:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
-.banner{border-radius:14px;padding:22px 18px;text-align:center;margin-bottom:10px;color:#fff; transition: background 0.3s;}
+.banner{border-radius:14px;padding:22px 18px;text-align:center;margin-bottom:10px;color:#fff;transition:background 0.3s}
 .blabel{font-size:38px;font-weight:900;line-height:1.1;margin-bottom:6px}
 .bsub{font-size:16px;opacity:.95;line-height:1.5}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
@@ -76,7 +75,7 @@ main{padding:12px;max-width:680px;margin:0 auto}
 
   <div class="errbox" id="errbox" style="display:none">
     <span id="errmsg">데이터를 가져오지 못했습니다.</span>
-    <button onclick="doLoad()" style="padding:5px 10px; border-radius:5px; border:none; background:#b91c1c; color:#fff;">재시도</button>
+    <button onclick="doLoad()" style="padding:5px 10px;border-radius:5px;border:none;background:#b91c1c;color:#fff;">재시도</button>
   </div>
 
   <div id="result" style="display:none">
@@ -91,7 +90,7 @@ main{padding:12px;max-width:680px;margin:0 auto}
         <div id="raininfo" class="tok">0.0mm</div>
       </div>
       <div class="card">
-        <div class="stitle">💦 현재 습도</div>
+        <div class="stitle">💦 시공 당일 아침 습도</div>
         <div id="huminfo" class="tok">0%</div>
       </div>
     </div>
@@ -102,7 +101,7 @@ main{padding:12px;max-width:680px;margin:0 auto}
     </div>
   </div>
 
-  <div class="card empty" id="empty">
+  <div class="card empty" id="empty" style="display:none">
     <h2>지역을 선택해 주세요</h2>
     <p>상단 드롭다운에서 현장 위치를 선택하면 분석이 시작됩니다.</p>
   </div>
@@ -110,141 +109,187 @@ main{padding:12px;max-width:680px;margin:0 auto}
 
 <script>
 // --- 데이터 및 설정 ---
-const LOC={
-  "서울":[{n:"강남구",la:37.5172,lo:127.0473},{n:"강동구",la:37.5301,lo:127.1238},{n:"서초구",la:37.4837,lo:127.0324},{n:"송파구",la:37.5145,lo:127.1059}],
-  "경기도":[{n:"시흥시(배곧)",la:37.3800,lo:126.7158},{n:"안산시",la:37.3236,lo:126.8219},{n:"부천시",la:37.5034,lo:126.7660},{n:"김포시",la:37.6154,lo:126.7158}],
-  "인천":[{n:"연수구(송도)",la:37.4099,lo:126.6780},{n:"서구",la:37.5450,lo:126.6760}]
+const LOC = {
+  "서울": [
+    {n:"강남구",  la:37.5172, lo:127.0473},
+    {n:"강동구",  la:37.5301, lo:127.1238},
+    {n:"서초구",  la:37.4837, lo:127.0324},
+    {n:"송파구",  la:37.5145, lo:127.1059}
+  ],
+  "경기도": [
+    {n:"시흥시(배곧)", la:37.3800, lo:126.7158},
+    {n:"안산시",       la:37.3236, lo:126.8219},
+    {n:"부천시",       la:37.5034, lo:126.7660},
+    {n:"김포시",       la:37.6154, lo:126.7158}
+  ],
+  "인천": [
+    {n:"연수구(송도)", la:37.4099, lo:126.6780},
+    {n:"서구",         la:37.5450, lo:126.6760}
+  ]
 };
 
-const MAT={
-  none:{hLim:85, dn:"시공 전 건조 확인"},
-  urethane:{hLim:75, dn:"이슬 건조 후 90분 대기 필수"},
-  epoxy:{hLim:75, dn:"바닥 함수율 6% 미만 확인"}
+// 재질별 습도 한계 및 주의사항
+const MAT = {
+  none:     { hLim: 85, dn: "시공 전 건조 상태 확인" },
+  urethane: { hLim: 75, dn: "이슬 건조 후 90분 대기 필수" },
+  epoxy:    { hLim: 75, dn: "바닥 함수율 6% 미만 확인" },
+  painting: { hLim: 80, dn: "외벽 수분 제거 후 시공" }
 };
 
-const ST={region:'서울',distIdx:0,mat:'none',dayOff:0};
+const ST = { region:'서울', distIdx:0, mat:'none', dayOff:0 };
 
 // --- 헬퍼 함수 ---
-function toGrid(lat,lon){
+function toGrid(lat, lon) {
   const RE=6371.00877, GRID=5, SLAT1=30, SLAT2=60, OLON=126, OLAT=38, XO=43, YO=136;
-  const DEGRAD=Math.PI/180;
+  const DEGRAD = Math.PI / 180;
   const re=RE/GRID, slat1=SLAT1*DEGRAD, slat2=SLAT2*DEGRAD, olon=OLON*DEGRAD, olat=OLAT*DEGRAD;
-  let sn=Math.log(Math.cos(slat1)/Math.cos(slat2))/Math.log(Math.tan(Math.PI*0.25+slat2*0.5)/Math.tan(Math.PI*0.25+slat1*0.5));
-  let sf=Math.pow(Math.tan(Math.PI*0.25+slat1*0.5),sn)*Math.cos(slat1)/sn;
-  let ro=re*sf/Math.pow(Math.tan(Math.PI*0.25+olat*0.5),sn);
-  let ra=re*sf/Math.pow(Math.tan(Math.PI*0.25+lat*DEGRAD*0.5),sn);
-  let theta=lon*DEGRAD-olon;
-  if(theta>Math.PI)theta-=2*Math.PI; if(theta<-Math.PI)theta+=2*Math.PI;
-  theta*=sn;
-  return{nx:Math.floor(ra*Math.sin(theta)+XO+0.5),ny:Math.floor(ro-ra*Math.cos(theta)+YO+0.5)};
+  let sn = Math.log(Math.cos(slat1)/Math.cos(slat2)) / Math.log(Math.tan(Math.PI*0.25+slat2*0.5) / Math.tan(Math.PI*0.25+slat1*0.5));
+  let sf = Math.pow(Math.tan(Math.PI*0.25+slat1*0.5), sn) * Math.cos(slat1) / sn;
+  let ro = re * sf / Math.pow(Math.tan(Math.PI*0.25+olat*0.5), sn);
+  let ra = re * sf / Math.pow(Math.tan(Math.PI*0.25+lat*DEGRAD*0.5), sn);
+  let theta = lon*DEGRAD - olon;
+  if (theta > Math.PI) theta -= 2*Math.PI;
+  if (theta < -Math.PI) theta += 2*Math.PI;
+  theta *= sn;
+  return { nx: Math.floor(ra*Math.sin(theta)+XO+0.5), ny: Math.floor(ro-ra*Math.cos(theta)+YO+0.5) };
 }
 
-function getBaseDateTime(){
-  const now=new Date();
-  const times=[2,5,8,11,14,17,20,23];
-  let h=now.getHours(), d=now;
-  let baseH=times.reverse().find(t=>h>=t+1)||23;
-  if(h<3) d.setDate(d.getDate()-1);
-  return{
-    date:`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`,
-    time:String(baseH).padStart(2,'0')+'00'
+// ✅ 수정①: times.reverse() 원본 파괴 버그 수정 + d=now 참조 버그 수정
+function getBaseDateTime() {
+  const now  = new Date();
+  const h    = now.getHours();
+  const d    = new Date(now); // ← 복사본 (참조 공유 방지)
+  if (h < 3) d.setDate(d.getDate() - 1);
+  const times  = [2,5,8,11,14,17,20,23];
+  const baseH  = [...times].reverse().find(t => h >= t + 1) || 23; // ← 스프레드로 원본 보존
+  return {
+    date: `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`,
+    time: String(baseH).padStart(2,'0') + '00'
   };
 }
 
 // --- 실행 로직 ---
-async function doLoad(){
-  const dist=LOC[ST.region][ST.distIdx];
-  const grid=toGrid(dist.la, dist.lo);
-  const base=getBaseDateTime();
+async function doLoad() {
+  const dist = LOC[ST.region][ST.distIdx];
+  const grid = toGrid(dist.la, dist.lo);
+  const base = getBaseDateTime();
+
+  // locinfo 업데이트
+  document.getElementById('locinfo').innerHTML =
+    `<strong>${ST.region} ${dist.n}</strong> · 격자 (${grid.nx}, ${grid.ny}) · 기준 ${base.date} ${base.time}`;
 
   show('loading');
 
   try {
-    const url=`/api/weather?nx=${grid.nx}&ny=${grid.ny}&region=${ST.region+dist.n}&base_date=${base.date}&base_time=${base.time}&day_off=${ST.dayOff}`;
-    const res=await fetch(url);
-    const wx=await res.json();
+    const url = `/api/weather?nx=${grid.nx}&ny=${grid.ny}&region=${ST.region+dist.n}&base_date=${base.date}&base_time=${base.time}&day_off=${ST.dayOff}`;
+    const res = await fetch(url);
+    const wx  = await res.json();
 
-    if(wx.error) throw new Error(wx.error);
+    if (wx.error) throw new Error(wx.error);
     render(wx);
   } catch(e) {
-    document.getElementById('errmsg').textContent=e.message;
+    document.getElementById('errmsg').textContent = e.message;
     show('errbox');
   }
 }
 
+// ✅ 수정②: wx.reh / wx.tmp 사용 + MAT 습도 기준 적용
 function render(wx) {
-  const items = wx.items || [];
   const rainAmt = wx.rain || 0;
-  // 현재 습도 찾기 (가장 빠른 예보 시간의 REH 값)
-  const currentREH = items.find(i=>i.category==='REH')?.fcstValue || 70;
-  const currentTMP = items.find(i=>i.category==='TMP')?.fcstValue || 20;
+  const reh     = wx.reh  || 70;  // weather.js가 내려주는 시공 당일 아침 습도
+  const tmp     = wx.tmp  || 15;  // weather.js가 내려주는 시공 당일 아침 기온
 
-  let bg='#15803d', title='정상 시공 가능', sub='강수 및 결로 위험 낮음';
+  // ✅ 재질별 습도 기준 적용
+  const matCfg = MAT[ST.mat] || MAT.none;
+  const hLim   = matCfg.hLim;
 
-  // 1. 현철 Standard: 강수량 0.3mm (주황색)
+  // 판정 (🟢초록 / 🟡노랑 / 🔴빨강)
+  let bg='#15803d', title='정상 시공 가능', sub='강수 및 결로 위험 낮음. 안전 수칙 준수하세요.';
+
   if (rainAmt >= 0.3) {
-    bg='#f97316'; title="전일 강수량 확인";
-    sub=`내일 새벽 5시까지 누적 ${rainAmt}mm 예보. 바닥 건조 확인 후 시공 결정!`;
-  } 
-  // 2. 현철 Standard: 습도 75% (노란색/주황)
-  else if (parseInt(currentREH) >= 75) {
-    bg='#b45309'; title="결로/이슬 주의";
-    sub=`${wx.isSpecial?'특수 지형: ':''}현재 습도 ${currentREH}%로 바닥 결로 위험이 높습니다.`;
+    // 🔴 시공 보류
+    bg='#dc2626';
+    title='시공 보류';
+    sub=`새벽 5시까지 누적 ${rainAmt}mm 예보. 바닥 건조 상태 확인 후 결정!`;
+  } else if (reh >= hLim) {
+    // 🟡 관리자 협의
+    bg='#d97706';
+    title='관리자 협의';
+    sub=`${wx.isSpecial ? '특수 지형: ' : ''}습도 ${reh}% (기준 ${hLim}%). ${matCfg.dn}`;
   }
 
-  // 화면 업데이트
-  document.getElementById('banner').style.background=bg;
-  document.getElementById('blabel').textContent=title;
-  document.getElementById('bsub').textContent=sub;
-  document.getElementById('raininfo').textContent=`${rainAmt.toFixed(1)}mm`;
-  document.getElementById('raininfo').className = rainAmt >= 0.3 ? 'twarn' : 'tok';
-  document.getElementById('huminfo').textContent=`${currentREH}%`;
-  document.getElementById('huminfo').className = parseInt(currentREH) >= 75 ? 'twarn' : 'tok';
+  // 배너
+  document.getElementById('banner').style.background = bg;
+  document.getElementById('blabel').textContent = title;
+  document.getElementById('bsub').textContent   = sub;
 
-  // 상세 정보 표시
-  document.getElementById('metrics').innerHTML=`
-    <div class="mrow"><span>기온</span><span class="mval">${currentTMP}°C</span></div>
-    <div class="mrow"><span>습도</span><span class="mval">${currentREH}%</span></div>
-    <div class="mrow"><span>특수지형 여부</span><span class="mval">${wx.isSpecial?'대상':'해당없음'}</span></div>
+  // 강수량 카드
+  document.getElementById('raininfo').textContent = `${rainAmt.toFixed(1)}mm`;
+  document.getElementById('raininfo').className   = rainAmt >= 0.3 ? 'twarn' : 'tok';
+
+  // 습도 카드
+  document.getElementById('huminfo').textContent = `${reh}%`;
+  document.getElementById('huminfo').className   = reh >= hLim ? 'twarn' : 'tok';
+
+  // 상세 정보
+  document.getElementById('metrics').innerHTML = `
+    <div class="mrow"><span>시공 당일 아침 기온</span><span class="mval">${tmp}°C</span></div>
+    <div class="mrow"><span>시공 당일 아침 습도</span><span class="mval ${reh >= hLim ? 'w' : ''}">${reh}%</span></div>
+    <div class="mrow"><span>재질별 습도 기준</span><span class="mval">${hLim}% 미만</span></div>
+    <div class="mrow"><span>특수 지형 여부</span><span class="mval">${wx.isSpecial ? '✅ 대상' : '해당없음'}</span></div>
+    ${ST.mat !== 'none' ? `<div class="mrow"><span>시공 주의사항</span><span class="mval" style="font-size:12px;color:#b45309">${matCfg.dn}</span></div>` : ''}
   `;
+
+  // 마지막 업데이트 시각
+  document.getElementById('lupd').textContent = new Date().toLocaleTimeString();
 
   show('result');
 }
 
 // --- UI 제어 ---
-function show(id){['loading','errbox','result','empty'].forEach(x=>document.getElementById(x).style.display=x===id?'block':'none');}
+function show(id) {
+  ['loading','errbox','result','empty'].forEach(x =>
+    document.getElementById(x).style.display = x === id ? 'block' : 'none'
+  );
+}
 
-function init(){
-  // 지역 설정
-  const sreg=document.getElementById('sreg');
-  sreg.innerHTML=Object.keys(LOC).map(r=>`<option>${r}</option>`).join('');
-  sreg.onchange=()=>{ ST.region=sreg.value; ST.distIdx=0; updateDist(); doLoad(); };
-  
+function init() {
+  // 지역 셀렉트
+  const sreg = document.getElementById('sreg');
+  sreg.innerHTML = Object.keys(LOC).map(r => `<option>${r}</option>`).join('');
+  sreg.onchange = () => { ST.region = sreg.value; ST.distIdx = 0; updateDist(); doLoad(); };
+
   updateDist();
-  
-  // 날짜 탭 (오늘/내일만 간단히)
-  const dtabs=document.getElementById('dtabs');
-  ['오늘','내일'].forEach((l,i)=>{
-    const b=document.createElement('button');
-    b.className=`dbtn ${i===0?'on':''}`;
-    b.textContent=l;
-    b.onclick=()=>{
-      ST.dayOff=i;
-      document.querySelectorAll('.dbtn').forEach((x,j)=>x.classList.toggle('on',i===j));
+
+  // 날짜 탭 (오늘 / 내일)
+  const dtabs = document.getElementById('dtabs');
+  ['오늘','내일'].forEach((l, i) => {
+    const b = document.createElement('button');
+    b.className = `dbtn ${i === 0 ? 'on' : ''}`;
+    b.textContent = l;
+    b.onclick = () => {
+      ST.dayOff = i;
+      document.querySelectorAll('.dbtn').forEach((x, j) => x.classList.toggle('on', i === j));
       doLoad();
     };
     dtabs.appendChild(b);
   });
+
+  // 재질 변경
+  document.getElementById('smat').onchange = e => { ST.mat = e.target.value; doLoad(); };
+
+  // 시계
+  setInterval(() => document.getElementById('clock').textContent = new Date().toLocaleTimeString(), 1000);
+
+  // ✅ 수정③: 초기 로드 (페이지 열자마자 날씨 표시)
+  doLoad();
 }
 
-function updateDist(){
-  const sdist=document.getElementById('sdist');
-  sdist.innerHTML=LOC[ST.region].map((d,i)=>`<option value="${i}">${d.n}</option>`).join('');
-  sdist.onchange=()=>{ ST.distIdx=parseInt(sdist.value); doLoad(); };
+function updateDist() {
+  const sdist = document.getElementById('sdist');
+  sdist.innerHTML = LOC[ST.region].map((d, i) => `<option value="${i}">${d.n}</option>`).join('');
+  sdist.onchange = () => { ST.distIdx = parseInt(sdist.value); doLoad(); };
 }
-
-document.getElementById('smat').onchange=(e)=>ST.mat=e.target.value;
-setInterval(()=>document.getElementById('clock').textContent=new Date().toLocaleTimeString(),1000);
 
 init();
 </script>
