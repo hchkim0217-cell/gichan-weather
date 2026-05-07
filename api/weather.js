@@ -1,4 +1,5 @@
-export default async function handler(req, res) {
+// ✅ CommonJS 방식 (Vercel 서버리스 함수 표준)
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   const KEY = process.env.KMA_API_KEY;
   const { nx, ny, region, base_date, base_time, day_off } = req.query;
@@ -9,7 +10,7 @@ export default async function handler(req, res) {
   // 1. 특수 지형 감지
   const isSpecial = /시흥|배곧|인천|안산|김포|강화|양평|가평|청평|포항|울산|부산|여수|목포|군산|강릉|속초|제주|산|강|포|항|천|호|도/.test(region || "");
 
-  // ✅ 날짜 계산 헬퍼 (월말 오류 방지)
+  // 날짜 계산 헬퍼 (월말 오류 방지)
   function getDateStr(baseDate, offsetDays) {
     const y = parseInt(baseDate.slice(0, 4));
     const m = parseInt(baseDate.slice(4, 6)) - 1;
@@ -22,7 +23,7 @@ export default async function handler(req, res) {
     );
   }
 
-  // ✅ 8초 타임아웃
+  // 8초 타임아웃
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 8000);
 
@@ -52,7 +53,7 @@ export default async function handler(req, res) {
 
     const items = data.response?.body?.items?.item || [];
 
-    // ✅ day_off 기반 날짜 계산
+    // day_off 기반 날짜 계산
     // dayOff=0(오늘): 오늘 12시 이후 ~ 내일 05시
     // dayOff=1(내일): 내일 12시 이후 ~ 모레 05시
     const targetDate = getDateStr(base_date, dayOff);
@@ -62,7 +63,7 @@ export default async function handler(req, res) {
     const rainItems = items
       .filter(i =>
         (i.fcstDate === targetDate && parseInt(i.fcstTime) >= 1200) ||
-        (i.fcstDate === nextDate   && parseInt(i.fcstTime) <= 500)  // ✅ 0500→500 수정
+        (i.fcstDate === nextDate   && parseInt(i.fcstTime) <= 500)
       )
       .filter(i => i.category === 'PCP');
 
@@ -104,4 +105,4 @@ export default async function handler(req, res) {
     console.error('[통신 오류]', e);
     return res.status(200).json({ error: "통신 준비 중", rain: 0, reh: 70, tmp: 15, isSpecial });
   }
-}
+};
