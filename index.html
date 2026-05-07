@@ -6,182 +6,97 @@
     <title>기찬시설관리 - 현장 날씨 매니저</title>
     <style>
         :root { --bg: #f8fafc; --card: #ffffff; --primary: #2563eb; --danger: #ef4444; --warning: #f59e0b; --success: #10b981; --text: #1e293b; }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 16px; line-height: 1.5; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); padding: 16px; margin: 0; }
         .container { max-width: 500px; margin: 0 auto; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .logo { font-weight: 800; font-size: 1.2rem; color: var(--primary); }
-        .card { background: var(--card); border-radius: 16px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 16px; }
-        .status-banner { border-radius: 12px; padding: 16px; text-align: center; font-weight: 700; margin-bottom: 16px; color: white; transition: all 0.3s; }
-        .status-ok { background: var(--success); }
-        .status-no { background: var(--danger); }
+        .card { background: var(--card); border-radius: 16px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 16px; }
+        .status-banner { border-radius: 12px; padding: 16px; text-align: center; font-weight: 700; color: white; margin-bottom: 16px; }
         .tabs { display: flex; gap: 8px; margin-bottom: 16px; background: #e2e8f0; padding: 4px; border-radius: 12px; }
-        .tab { flex: 1; text-align: center; padding: 8px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; border: none; background: transparent; color: #64748b; }
-        .tab.active { background: white; color: var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .info-item { background: #f1f5f9; padding: 12px; border-radius: 10px; }
-        .info-label { font-size: 0.75rem; color: #64748b; margin-bottom: 4px; }
-        .info-value { font-weight: 700; font-size: 1rem; }
-        .loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.9); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
-        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 12px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .tab { flex: 1; padding: 8px; border-radius: 8px; cursor: pointer; border: none; background: transparent; font-weight: 600; }
+        .tab.active { background: white; color: var(--primary); }
+        .loading { display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.8); flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <div class="logo">GICHAN WEATHER</div>
-            <div id="region-display" style="font-size: 0.9rem; font-weight: 600;">경기도 광명시</div>
+        <div class="header" style="display:flex; justify-content:space-between; margin-bottom:20px;">
+            <b style="color:var(--primary)">GICHAN WEATHER</b>
+            <span id="region-txt" style="font-weight:600">경기도 광명시</span>
         </div>
 
         <div class="tabs">
-            <button class="tab active" onclick="changeTab(0)">오늘</button>
-            <button class="tab" onclick="changeTab(1)">내일</button>
-            <button class="tab" onclick="changeTab(2)">모레</button>
+            <button class="tab active" onclick="changeTab(0)">오늘 시공</button>
+            <button class="tab" onclick="changeTab(1)">내일 시공</button>
         </div>
 
-        <div id="status-box" class="status-banner status-ok">시공 가능성 높음</div>
+        <div id="status-box" class="status-banner">데이터 로딩 중...</div>
 
         <div class="card">
-            <div style="margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px;">
-                <span style="font-weight: 700;">💧 바닥건조 예측 (함수율 관리)</span>
-            </div>
-            <div id="ground-status" style="font-size: 0.95rem; font-weight: 600;">데이터 분석 중...</div>
+            <div style="font-weight:700; margin-bottom:10px;">💧 바닥건조 & 결로 예측</div>
+            <div id="ground-status" style="line-height:1.6;">지형 및 기상 분석 중입니다...</div>
         </div>
 
-        <div class="card">
-            <div class="info-grid">
-                <div class="info-item">
-                    <div class="info-label">평균 기온</div>
-                    <div id="temp-val" class="info-value">- ℃</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">최고 습도</div>
-                    <div id="humi-val" class="info-value">- %</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">강수 확률</div>
-                    <div id="rain-prob" class="info-value">- %</div>
-                </div>
-                <div id="rain-amount-item" class="info-item">
-                    <div class="info-label">예상 강수량</div>
-                    <div id="rain-val" class="info-value">- mm</div>
-                </div>
+        <div class="card" id="weather-info">
             </div>
-        </div>
     </div>
 
-    <div id="loading" class="loading-overlay">
-        <div class="spinner"></div>
-        <div id="load-msg" style="font-weight: 600; color: #475569;">기상청 데이터 분석 중...</div>
-    </div>
+    <div id="loading" class="loading"><div>분석 중...</div></div>
 
     <script>
-        // 초기 설정
-        const ST = { region: "경기도", distIdx: 0, dayOff: 0, rain: 'no_rain' };
-        const LOC = { "경기도": [{ name: "광명시", la: 37, lo: 126, midRegId: "11B00000" }] };
+        const ST = { region: "경기도", dayOff: 0 };
+        const LOC = { "경기도": { name: "광명시", la: 37, lo: 126 } };
 
-        function changeTab(day) {
-            ST.dayOff = day;
-            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === day));
+        function changeTab(d) {
+            ST.dayOff = d;
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === d));
             doLoad();
         }
 
-        async function fetchShort(la, lo, day) {
-            const now = new Date();
-            const baseDate = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
-            const res = await fetch(`/api/weather?type=short&nx=${la}&ny=${lo}&base_date=${baseDate}&base_time=0500`).then(r=>r.json());
-            
-            // 날짜별 필터링 (0:오늘, 1:내일, 2:모레)
-            const targetDate = new Date();
-            targetDate.setDate(targetDate.getDate() + day);
-            const targetStr = `${targetDate.getFullYear()}${String(targetDate.getMonth()+1).padStart(2,'0')}${String(targetDate.getDate()).padStart(2,'0')}`;
-            
-            const dayItems = res.filter(i => i.fcstDate === targetStr);
-            const temps = dayItems.filter(i => i.category === 'TMP').map(i => parseFloat(i.fcstValue));
-            const humis = dayItems.filter(i => i.category === 'REH').map(i => parseFloat(i.fcstValue));
-            const rains = dayItems.filter(i => i.category === 'POP').map(i => parseFloat(i.fcstValue));
-            const amounts = dayItems.filter(i => i.category === 'PCP').map(i => i.fcstValue === '강수없음' ? 0 : parseFloat(i.fcstValue.replace('mm','')));
-
-            return {
-                avgTemp: (temps.reduce((a,b)=>a+b,0)/temps.length).toFixed(1),
-                maxHumi: Math.max(...humis),
-                maxPop: Math.max(...rains),
-                totalRain: amounts.reduce((a,b)=>a+b,0).toFixed(1),
-                hourly: dayItems.filter(i => i.category === 'PCP').map(i => ({ rain: i.fcstValue === '강수없음' ? 0 : parseFloat(i.fcstValue) }))
-            };
-        }
-
-        function dateStr(offset = 0) {
-            const d = new Date();
-            d.setDate(d.getDate() + offset);
-            return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
-        }
-
         async function doLoad() {
-            const loading = document.getElementById('loading');
-            loading.style.display = 'flex';
-            
-            const targetDate = dateStr(ST.dayOff);
-            const dist = LOC[ST.region][ST.distIdx];
+            document.getElementById('loading').style.display = 'flex';
+            const loc = LOC[ST.region];
+            const today = new Date().toISOString().slice(0,10).replace(/-/g,'');
 
             try {
-                // 1. 날씨 데이터 가져오기
-                const wx = await fetchShort(dist.la, dist.lo, ST.dayOff);
+                // 1. 서버에서 정밀 분석 데이터 가져오기
+                const res = await fetch(`/api/weather?type=past_rain&region=${ST.region}&nx=${loc.la}&ny=${loc.lo}&day_off=${ST.dayOff}&base_date=${today}&base_time=0500`).then(r=>r.json());
                 
-                // 2. [핵심] 전일 강수량 자동 계산 로직
-                let pastRain = 0;
-                if (ST.dayOff === 0) {
-                    // 오늘 탭: 어제 실측 강수량 조회
-                    const res = await fetch(`/api/weather?type=past_rain&region=${ST.region}&target_date=${targetDate}`).then(r=>r.json());
-                    pastRain = res.rain || 0;
-                } else {
-                    // 내일/모레 탭: 그 전날의 예보 강수량 합산
-                    const prevWx = await fetchShort(dist.la, dist.lo, ST.dayOff - 1);
-                    pastRain = prevWx.totalRain;
-                }
-
-                // 3. 화면 렌더링
-                render(wx, pastRain);
-            } catch (e) {
-                console.error(e);
-                alert("데이터 로드 중 오류가 발생했습니다.");
-            } finally {
-                loading.style.display = 'none';
-            }
+                // 2. 단기 예보 가져오기 (결로 판단용)
+                const wx = await fetch(`/api/weather?type=short&nx=${loc.la}&ny=${loc.lo}&base_date=${today}&base_time=0500`).then(r=>r.json());
+                
+                render(res, wx);
+            } catch (e) { alert("오류 발생"); }
+            finally { document.getElementById('loading').style.display = 'none'; }
         }
 
-        function render(wx, pastRain) {
-            document.getElementById('temp-val').textContent = `${wx.avgTemp} ℃`;
-            document.getElementById('humi-val').textContent = `${wx.maxHumi} %`;
-            document.getElementById('rain-prob').textContent = `${wx.maxPop} %`;
-            document.getElementById('rain-val').textContent = `${wx.totalRain} mm`;
-
+        function render(data, wxItems) {
             const statusBox = document.getElementById('status-box');
             const groundBox = document.getElementById('ground-status');
+            
+            // 결로 로직: 습도 85% 이상 (지형 가중치 적용 시 80%)
+            const humidLimit = data.isHumidArea ? 80 : 85;
+            const highHumi = wxItems.some(i => i.category === 'REH' && parseFloat(i.fcstValue) >= humidLimit);
+            
+            let status = 'ok', msg = '', detail = '';
 
-            // 판정 로직
-            const isRainy = wx.maxPop >= 50 || parseFloat(wx.totalRain) > 0;
-            const isWet = parseFloat(pastRain) > 0;
-
-            if (isRainy) {
-                statusBox.textContent = "시공 취소 권장 (비 예보)";
-                statusBox.className = "status-banner status-no";
-                groundBox.innerHTML = `⚠️ 해당 일에 비 예보가 있습니다.<br><small>(예상 강수량: ${wx.totalRain}mm)</small>`;
-            } else if (isWet) {
-                statusBox.textContent = "시공 주의 (바닥 젖음)";
-                statusBox.className = "status-banner status-no"; // 주의도 빨간색/주황색으로 강조
-                statusBox.style.background = "#f59e0b"; // 주황색(Warning)
-                groundBox.innerHTML = `❗ 전일 강수량(${pastRain}mm) 확인됨.<br>바닥 함수율 측정 후 진행하세요.`;
+            if (data.rain > 0 || data.hasNightRain) {
+                status = 'no';
+                msg = ST.dayOff === 0 ? "시공 불가 (어제 비 왔음)" : "시공 불가 (야간 강우 예보)";
+                detail = `⚠️ 전일/야간 강수량 ${data.rain}mm가 확인됩니다. 바닥이 젖어 있을 확률이 매우 높습니다.`;
+            } else if (highHumi) {
+                status = 'warn';
+                msg = "시공 주의 (결로/이슬 위험)";
+                detail = `❗ ${data.isHumidArea ? '수변/산간 지형 특성상' : '습도가 높아'} 이슬점 발생 위험이 있습니다. 바닥이 눅눅할 수 있으니 확인 바랍니다.`;
             } else {
-                statusBox.textContent = "시공 가능성 높음";
-                statusBox.className = "status-banner status-ok";
-                statusBox.style.background = "#10b981";
-                groundBox.innerHTML = `✅ 전일 비 안옴 (바닥 건조 예상)`;
+                status = 'ok';
+                msg = "시공 가능성 높음";
+                detail = "✅ 전일 비 없음 및 야간 결로 위험 낮음. 바닥 상태 양호 예상.";
             }
+
+            statusBox.textContent = msg;
+            statusBox.style.background = status === 'ok' ? '#10b981' : (status === 'no' ? '#ef4444' : '#f59e0b');
+            groundBox.innerHTML = detail;
         }
 
-        // 앱 시작 시 호출
         doLoad();
     </script>
 </body>
