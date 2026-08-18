@@ -532,7 +532,9 @@ function getAmPmProb(hourly){
 function render(wx){
   const cfg=MAT[ST.mat],cur=wx.current;
   const {amProb, pmProb} = getAmPmProb(wx.hourly);
-  const rainInfo=findRain(wx.hourly,wx.nowH);
+  // 중기예보는 오전/오후 확률만 있고 시간대 정보가 없다 — 시간대 판정에서 제외한다
+  // (제외하지 않으면 pop>=50 구간이 pty=1로 채워져 "01:00~23:00 강수"처럼 잘못 표시된다)
+  const rainInfo=wx.isMid?null:findRain(wx.hourly,wx.nowH);
   const lateRainStart = rainInfo && rainInfo.sH >= 15 ? rainInfo.sH : null;
   const jud=getJudge(amProb, pmProb, lateRainStart);
 
@@ -571,7 +573,17 @@ function render(wx){
 
   // 강수
   const rEl=document.getElementById('raininfo');
-  if(!rainInfo){
+  if(wx.isMid){
+    // 중기예보는 시간대를 알 수 없으므로 오전/오후 확률만 안내한다
+    const mx=Math.max(amProb,pmProb);
+    if(mx>=50){
+      rEl.innerHTML=`<div class="twarn">강수 예보 있음</div><div class="tok-sub" style="margin-top:4px">중기예보는 시간대 구분 없음 — 오전 ${amProb}% / 오후 ${pmProb}%</div>`;
+    } else if(mx>=40){
+      rEl.innerHTML=`<div class="twarn">강수 가능성 있음</div><div class="tok-sub" style="margin-top:4px">중기예보는 시간대 구분 없음 — 오전 ${amProb}% / 오후 ${pmProb}%</div>`;
+    } else {
+      rEl.innerHTML=`<div class="tok">강수 가능성 낮음</div><div class="tok-sub">— 오전 ${amProb}% / 오후 ${pmProb}%</div>`;
+    }
+  } else if(!rainInfo){
     rEl.innerHTML=`<div class="tok">강수 예보 없음</div><div class="tok-sub">— 보양 불요</div>`;
   } else {
     const rows=rainInfo.am.map(a=>`<div class="rrow" style="color:${a.mm>0?'#b91c1c':'#94a3b8'}"><span>${hh(a.h)}</span><span style="font-weight:${a.mm>0?700:400}">${a.mm>0?a.mm+'mm':'—'}</span></div>`).join('');
