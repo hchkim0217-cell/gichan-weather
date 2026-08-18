@@ -1,7 +1,11 @@
 // /api/calendar - 구글 캘린더 구독용 ICS 피드
-// 기존 /api/weather 프록시를 재사용해 단기(0~2일) + 중기(3~9일) 예보를 종일 일정으로 발행
-// 사용법: /api/calendar?loc=서울/중구  또는  /api/calendar?la=37.564&lo=126.9975&reg=11B10101&name=서울 중구
+// KMA apihub 단기예보(0~3일) + 중기예보(4~9일)를 종일 일정으로 발행
+//
+// 기본 지역: 광명 일직로 (파라미터를 주지 않으면 이 값이 쓰인다)
+// 지역 지정: /api/calendar?loc=서울/송파구
+//            /api/calendar?la=37.4165&lo=126.8845&reg=11B10101&name=광명 일직로
 // 옵션: days=7 (기본 7, 최대 10)
+// 진단: debug=mid (중기 typ02 원본) / debug=mid01 (중기 typ01 원본)
 
 const APP_URL = 'https://gichan-weather-hchkim0217-2582s-projects.vercel.app';
 const KST_OFFSET = 9 * 60 * 60 * 1000;
@@ -313,7 +317,8 @@ export default async function handler(req, res) {
     }
     la = hit.la; lo = hit.lo; reg = hit.midRegId; name = name || `${sido} ${hit.n}`;
   }
-  if (isNaN(la) || isNaN(lo) || !reg) { la = 37.5640; lo = 126.9975; reg = '11B10101'; name = name || '서울 중구'; }
+  // 기본 지역 — 광명 일직로 (앱 LOC의 광명시 좌표는 철산동 기준이라 격자가 달라 직접 지정)
+  if (isNaN(la) || isNaN(lo) || !reg) { la = 37.4165; lo = 126.8845; reg = '11B10101'; name = name || '광명 일직로'; }
   name = name || '현장';
 
   // 진단 모드: 중기예보 typ02 원본 JSON을 그대로 확인한다 (authKey는 출력하지 않음)
