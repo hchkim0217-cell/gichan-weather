@@ -678,10 +678,13 @@ function initDays(){
     const d=new Date();d.setDate(d.getDate()+i);
     const lab=labels[i]||`${i+1}일후`;
     const md=d.toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'});
+    const wd=['일','월','화','수','목','금','토'][d.getDay()];
     const b=document.createElement('button');
     const isMid=i>=3;
     b.className=`dbtn${isMid?' mid':''}${i===ST.dayOff?' on':''}`;
-    b.innerHTML = isMid ? md : `${lab} <span style="font-weight:400;opacity:.8">${md}</span>`;
+    b.innerHTML = isMid
+      ? `${md} <span style="font-weight:400;opacity:.75">(${wd})</span>`
+      : `${lab} <span style="font-weight:400;opacity:.8">${md} (${wd})</span>`;
     b.onclick=()=>{ST.dayOff=i;document.querySelectorAll('.dbtn').forEach((x,j)=>{const m=j>=3;x.className=`dbtn${m?' mid':''}${j===i?' on':''}`;});show('empty');doLoad();};
     w.appendChild(b);
   }
