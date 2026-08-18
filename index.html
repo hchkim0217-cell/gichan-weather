@@ -598,15 +598,23 @@ function render(wx){
   // 강수
   const rEl=document.getElementById('raininfo');
   if(wx.isMid){
-    // 중기예보는 시간대를 알 수 없으므로 오전/오후 확률만 안내한다
+    // 중기예보는 시각을 알 수 없다. 대신 언제·어느 정도 오는지와 지금 할 일을 알린다.
     const mx=Math.max(amProb,pmProb);
-    if(mx>=50){
-      rEl.innerHTML=`<div class="twarn">강수 예보 있음</div><div class="tok-sub" style="margin-top:4px">중기예보는 시간대 구분 없음 — 오전 ${amProb}% / 오후 ${pmProb}%</div>`;
-    } else if(mx>=40){
-      rEl.innerHTML=`<div class="twarn">강수 가능성 있음</div><div class="tok-sub" style="margin-top:4px">중기예보는 시간대 구분 없음 — 오전 ${amProb}% / 오후 ${pmProb}%</div>`;
-    } else {
-      rEl.innerHTML=`<div class="tok">강수 가능성 낮음</div><div class="tok-sub">— 오전 ${amProb}% / 오후 ${pmProb}%</div>`;
-    }
+    let title, cls, act;
+    if(amProb>=60 && pmProb>=60){ title='종일 비 예상'; cls='twarn'; act='시공 불가 — 전날까지 보양 완료'; }
+    else if(amProb>=60){ title='오전 비 예상'; cls='twarn'; act='오전 시공 불가 — 오후 재확인'; }
+    else if(pmProb>=60){ title='오후 비 예상'; cls='twarn'; act='오전 작업 후 오후 보양'; }
+    else if(mx>=40){ title='비 올 수 있음'; cls='twarn'; act='자재 반입·보양재 준비'; }
+    else { title='비 가능성 낮음'; cls='tok'; act='현재로선 시공 가능'; }
+
+    // 이 날짜가 단기예보(시간대별) 범위에 들어오는 날
+    const sd=new Date(); sd.setDate(sd.getDate()+Math.max(0,ST.dayOff-3));
+    const sdTxt=`${sd.getMonth()+1}월 ${sd.getDate()}일(${['일','월','화','수','목','금','토'][sd.getDay()]})`;
+
+    rEl.innerHTML=`<div class="${cls}">${title}</div>`
+      +`<div class="tok-sub" style="margin-top:4px">오전 ${amProb}% · 오후 ${pmProb}%${wx.wf?` · ${wx.wf}`:''}</div>`
+      +`<div class="tprot" style="margin-top:6px">${act}</div>`
+      +`<div class="tnote">중기예보는 오전·오후 확률만 발표해 비 오는 시각과 강수량을 알 수 없다. ${sdTxt}부터 단기예보로 바뀌면 시간대·시간당 강수량·보양 완료 시각이 표시된다. 그때 최종 확정하면 된다.</div>`;
   } else if(!rainInfo){
     rEl.innerHTML=`<div class="tok">강수 예보 없음</div><div class="tok-sub">— 보양 불요</div>`;
   } else {
