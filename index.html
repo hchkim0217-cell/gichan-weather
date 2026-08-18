@@ -88,8 +88,8 @@ main{padding:12px;max-width:680px;margin:0 auto}
 .badge-short{background:#dcfce7;color:#166534}
 .badge-mid{background:#e8f0fe;color:#1e3a8a}
 .refbtn{padding:7px 16px;background:#334155;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600}
-#fover{display:none;position:fixed;inset:0;background:rgba(185,28,28,.45);animation:pulse .6s infinite;z-index:9998;pointer-events:none}
-#fbanner{display:none;position:fixed;top:64px;left:50%;transform:translateX(-50%);background:#b91c1c;color:#fff;padding:12px 26px;border-radius:12px;font-size:15px;font-weight:700;z-index:9999;white-space:nowrap}
+#fover{display:none;position:fixed;inset:0;background:rgba(185,28,28,.45);animation:pulse .6s 3;z-index:9998;pointer-events:none}
+#fbanner{display:none;position:fixed;top:64px;left:50%;transform:translateX(-50%);background:#b91c1c;color:#fff;padding:12px 26px;border-radius:12px;font-size:15px;font-weight:700;z-index:9999;white-space:nowrap;pointer-events:none}
 .empty{text-align:center;padding:48px 20px}
 .empty-icon{font-size:44px;margin-bottom:12px}
 .empty h2{font-size:16px;font-weight:700;color:#334155;margin-bottom:6px}
@@ -631,10 +631,12 @@ function render(wx){
 
   // 플래시
   if(ST.prevP!==null && cur.precipProb-ST.prevP>=20){
-    document.getElementById('fover').style.display='block';
-    document.getElementById('fbanner').style.display='block';
+    const fo=document.getElementById('fover'), fb=document.getElementById('fbanner');
+    // 점멸 3회(0.6초 × 3 = 1.8초) 후 종료 — 계속 깜빡이면 그동안 다른 버튼을 누르기 어렵다
+    fo.style.animation='none'; void fo.offsetWidth; fo.style.animation='pulse .6s 3';
+    fo.style.display='block'; fb.style.display='block';
     clearTimeout(ST.flashT);
-    ST.flashT=setTimeout(()=>{document.getElementById('fover').style.display='none';document.getElementById('fbanner').style.display='none';},12000);
+    ST.flashT=setTimeout(()=>{fo.style.display='none';fb.style.display='none';},2000);
   }
   ST.prevP=cur.precipProb;
 
