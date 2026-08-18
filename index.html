@@ -47,6 +47,7 @@ main{padding:12px;max-width:680px;margin:0 auto}
 .bhint{font-size:10px;opacity:.65;margin-bottom:2px}
 .blabel{font-size:29px;font-weight:900;line-height:1.15;margin-bottom:3px}
 .bsub{font-size:13.5px;opacity:.95;line-height:1.35}
+.bmid{display:none;font-size:11px;opacity:.8;margin-top:7px;padding-top:6px;border-top:1px solid rgba(255,255,255,.28)}
 .midnotice{background:#e8f0fe;border:1px solid #3b5bdb;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#1e3a8a}
 .tmrwarn{border-radius:12px;padding:14px 16px;margin-bottom:10px;background:#7f1d1d;color:#fff;border-left:5px solid #ef4444}
 .tmrwarn .tw1{font-size:13px;font-weight:900;margin-bottom:4px}
@@ -143,8 +144,8 @@ main{padding:12px;max-width:680px;margin:0 auto}
       <div class="bhint">🟢≤30% · 🟡40% · 🔴≥50%</div>
       <div class="blabel" id="blabel"></div>
       <div class="bsub" id="bsub"></div>
+      <div class="bmid" id="bmid"></div>
     </div>
-    <div id="midnotice"></div>
     <div id="tmrwarn"></div>
 
     <!-- 시공 시간 지침 -->
@@ -558,11 +559,13 @@ function render(wx){
   const heat=cur.temp>=33;
   const noWarn=![heat,!isDewOk,!isHumOk,!!rainInfo].some(Boolean);
 
-  // 중기예보 안내
-  const mn=document.getElementById('midnotice');
+  // 중기예보 여부는 판정 배너 안에 한 줄로 표시한다
+  // (강수확률·기온은 아래 강수 예보·기상 정보 카드에 이미 나오므로 중복 표기하지 않는다)
+  const bm=document.getElementById('bmid');
   if(wx.isMid){
-    mn.innerHTML=`<div class="midnotice">📅 중기예보 (4~9일) — 오전 강수확률 ${wx.amPop}% / 오후 ${wx.pmPop}% · 기온 ${wx.minT?.toFixed(0)}~${wx.maxT?.toFixed(0)}°C${wx.wf?` · ${wx.wf}`:''}<br><small style="opacity:.7">※ 중기예보는 단기예보보다 오차가 클 수 있습니다</small></div>`;
-  } else { mn.innerHTML=''; }
+    bm.innerHTML='📅 중기예보 (4~9일) · 단기예보보다 오차가 클 수 있습니다';
+    bm.style.display='block';
+  } else { bm.innerHTML=''; bm.style.display='none'; }
 
   // 배너
   document.getElementById('banner').style.background=jud.bg;
@@ -620,8 +623,24 @@ function render(wx){
   } else {
     const rows=rainInfo.am.map(a=>`<div class="rrow" style="color:${a.mm>0?'#b91c1c':'#94a3b8'}"><span>${hh(a.h)}</span><span style="font-weight:${a.mm>0?700:400}">${a.mm>0?a.mm+'mm':'—'}</span></div>`).join('');
     const tot=rainInfo.total>0?`<div class="rtotal"><span>합계</span><span>${rainInfo.total}mm</span></div>`:'';
-    rEl.innerHTML=`<div class="twarn">${hh(rainInfo.sH)} ~ ${hh(rainInfo.eH)} 강수</div>
-      <div class="tprot">${hh(rainInfo.protH)}까지 보양 완료</div>
+    const span=rainInfo.sH===rainInfo.eH?hh(rainInfo.sH):`${hh(rainInfo.sH)} ~ ${hh(rainInfo.eH)}`;
+
+    // 강수 시각이 작업시간(08~18시)과 겹치는지에 따라 대응이 달라진다
+    const WS=8, WE=18;
+    let phase, body;
+    if(rainInfo.eH < WS){
+      phase='작업 전';
+      body=`<div class="tok-sub" style="margin-top:4px">작업 시작 전 그침 — 소지면 건조 확인 후 시공</div>`;
+    } else if(rainInfo.sH >= WE){
+      phase='작업 후';
+      body=`<div class="tok-sub" style="margin-top:4px">작업 종료 후 강수 — 퇴근 전 당일 시공분 보양</div>`;
+    } else {
+      phase='작업 중';
+      body=`<div class="tprot">${hh(rainInfo.protH)}까지 보양 완료</div>`;
+    }
+
+    rEl.innerHTML=`<div class="twarn">${span} 강수 · ${phase}</div>
+      ${body}
       <div class="rtable"><div class="rtitle">시간당 강수량</div>${rows}${tot}</div>`;
   }
 
