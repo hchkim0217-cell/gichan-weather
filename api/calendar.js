@@ -162,10 +162,33 @@ function toLandRegId(cityRegId) {
   return p4 + '0000';
 }
 
+// 두 날짜(YYYYMMDD) 사이의 일수 차
+function ymdDiff(fromYmd, toYmd) {
+  const p = v => Date.UTC(+v.substring(0, 4), +v.substring(4, 6) - 1, +v.substring(6, 8));
+  return Math.round((p(toYmd) - p(fromYmd)) / 86400000);
+}
+
+// 중기예보 필드번호는 "발표일 기준 N일차"다. 발표일이 어제면 오늘 기준과 하루 어긋나므로
+// rnSt5 → rnSt4 처럼 번호를 당겨 오늘 기준으로 정규화한다.
+function shiftFields(item, shift) {
+  if (!item) return {};
+  if (!shift) return item;
+  const out = {};
+  for (const k of Object.keys(item)) {
+    const m = k.match(/^(rnSt|wf|taMin|taMax)(\d+)(Am|Pm)?$/);
+    if (!m) { out[k] = item[k]; continue; }
+    const n = parseInt(m[2]) - shift;
+    if (n >= 1) out[`${m[1]}${n}${m[3] || ''}`] = item[k];
+  }
+  return out;
+}
+
 // 중기예보 typ02 JSON 직접 호출 (getMidLandFcst / getMidTa 는 활용신청 승인됨)
+// 06시 발표는 4일차부터, 18시 발표는 5일차부터 제공하므로 두 발표를 병합해 공백을 메운다.
 async function fetchMid(origin, regId) {
   const KEY = process.env.KMA_API_KEY;
   const landReg = toLandRegId(regId);
+  const today = ymd(kstNow());
 
   const call = async (svc, reg, tm) => {
     const url = `https://apihub.kma.go.kr/api/typ02/openApi/MidFcstInfoService/${svc}`
@@ -190,27 +213,25 @@ async function fetchMid(origin, regId) {
     return null;
   };
   const pick = d => d?.response?.body?.items?.item?.[0];
-  const empty = o => !o || Object.keys(o).length <= 1;
 
-  const tmFc = getMidTmFc();
-  let [land, temp] = await Promise.all([
-    call('getMidLandFcst', landReg, tmFc),
-    call('getMidTa', regId, tmFc)
+  const cur = getMidTmFc(), prev = getPrevMidTmFc();
+  const curShift = ymdDiff(cur.substring(0, 8), today);
+  const prevShift = ymdDiff(prev.substring(0, 8), today);
+
+  const [land1, temp1, land2, temp2] = await Promise.all([
+    call('getMidLandFcst', landReg, cur),
+    call('getMidTa', regId, cur),
+    call('getMidLandFcst', landReg, prev),
+    call('getMidTa', regId, prev)
   ]);
-  const lErr = kmaErr(land), tErr = kmaErr(temp);
-  let li = pick(land), ti = pick(temp);
 
-  // 발표 직후 미생성 케이스 → 이전 발표시각 재시도
-  if ((empty(li) || empty(ti)) && !lErr && !tErr) {
-    const prev = getPrevMidTmFc();
-    const [land2, temp2] = await Promise.all([
-      call('getMidLandFcst', landReg, prev),
-      call('getMidTa', regId, prev)
-    ]);
-    if (empty(li)) li = pick(land2);
-    if (empty(ti)) ti = pick(temp2);
-  }
-  return { li: li || {}, ti: ti || {}, err: lErr || tErr || null, landReg };
+  const err = kmaErr(land1) || kmaErr(temp1) || null;
+
+  // 최신 발표 우선, 최신에 없는 일차만 이전 발표로 보충
+  const li = { ...shiftFields(pick(land2), prevShift), ...shiftFields(pick(land1), curShift) };
+  const ti = { ...shiftFields(pick(temp2), prevShift), ...shiftFields(pick(temp1), curShift) };
+
+  return { li, ti, err: (Object.keys(li).length <= 1 && Object.keys(ti).length <= 1) ? err : null, landReg };
 }
 
 function midToHourly(li, ti, d) {
