@@ -26,7 +26,26 @@ export default async function handler(req, res) {
     }
   }
 
-  // 중기육상예보 / 중기기온예보: typ01 raw → 변환
+  // 중기육상예보 / 중기기온예보: typ02 JSON 그대로 (권장)
+  // 육상은 광역 구역코드(11B00000 등), 기온은 도시코드(11B10101 등)로 regId 체계가 다르다
+  if (type === 'mid_land2' || type === 'mid_temp2') {
+    const svc = type === 'mid_land2' ? 'getMidLandFcst' : 'getMidTa';
+    const url = `https://apihub.kma.go.kr/api/typ02/openApi/MidFcstInfoService/${svc}`
+      + `?pageNo=1&numOfRows=10&dataType=JSON&regId=${regId}&tmFc=${tmFc}&authKey=${KEY}`;
+    try {
+      const r = await fetch(url);
+      const text = await r.text();
+      try {
+        return res.status(200).json(JSON.parse(text));
+      } catch {
+        return res.status(200).json({ error: 'JSON 아님', raw: text.substring(0, 180), type });
+      }
+    } catch (e) {
+      return res.status(500).json({ error: e.message, type });
+    }
+  }
+
+  // 중기예보 typ01 raw → 변환 (구버전 호환용. 파싱이 불안정해 mid_land2/mid_temp2 사용 권장)
   if (type === 'mid_land' || type === 'mid_temp') {
     return await handleMidTyp01(res, KEY, type, regId, tmFc);
   }
