@@ -367,20 +367,65 @@ async function fetchShort(la,lo,dayOff){
   };
 }
 
+// ── 중기예보 지역코드 변환 ─────────────────────────────────────────
+// 기온(getMidTa)은 도시코드, 육상(getMidLandFcst)은 광역 구역코드로 체계가 다르다
+// 11B(서울·인천·경기)만 11B00000 단일 구역이고, 나머지는 앞 4자리 + 0000
+function toLandRegId(cityRegId){
+  const p4=String(cityRegId).substring(0,4);
+  if(p4.startsWith('11B'))return '11B00000';
+  return p4+'0000';
+}
+
+function ymdDiff(fromYmd,toYmd){
+  const p=v=>Date.UTC(+v.substring(0,4),+v.substring(4,6)-1,+v.substring(6,8));
+  return Math.round((p(toYmd)-p(fromYmd))/86400000);
+}
+
+// 중기예보 필드번호는 "발표일 기준 N일차"다. 발표일이 어제면 오늘 기준과 하루 어긋나므로
+// rnSt5 → rnSt4 처럼 번호를 당겨 오늘 기준으로 정규화한다.
+// (자정~06시 구간에 전날 18시 발표를 쓸 때 하루 밀린 예보가 표시되는 것을 막는다)
+function shiftFields(item,shift){
+  if(!item)return{};
+  if(!shift)return item;
+  const out={};
+  for(const k of Object.keys(item)){
+    const m=k.match(/^(rnSt|wf|taMin|taMax)(\d+)(Am|Pm)?$/);
+    if(!m){out[k]=item[k];continue;}
+    const n=parseInt(m[2])-shift;
+    if(n>=1)out[`${m[1]}${n}${m[3]||''}`]=item[k];
+  }
+  return out;
+}
+
 async function fetchMid(regId,dayOff){
-  const tmFc=getMidTmFc();
-  const landUrl=`/api/weather?type=mid_land&regId=${regId}&tmFc=${tmFc}`;
-  const tempUrl=`/api/weather?type=mid_temp&regId=${regId}&tmFc=${tmFc}`;
-  const[landRes,tempRes]=await Promise.all([fetch(landUrl),fetch(tempUrl)]);
-  const[land,temp]=await Promise.all([landRes.json(),tempRes.json()]);
+  const landReg=toLandRegId(regId);
+  const today=dateStr(0);
+  const cur=getMidTmFc(), prev=getPrevMidTmFc();
+  const curShift=ymdDiff(cur.substring(0,8),today);
+  const prevShift=ymdDiff(prev.substring(0,8),today);
+
+  const get=async(type,reg,tm)=>{
+    try{
+      const r=await fetch(`/api/weather?type=${type}&regId=${reg}&tmFc=${tm}`);
+      return await r.json();
+    }catch(e){ return {__err:e.message}; }
+  };
+
+  // 06시 발표는 4일차부터, 18시 발표는 5일차부터 제공한다.
+  // 두 발표를 모두 받아 병합해야 4일차 공백이 생기지 않는다.
+  const[l1,t1,l2,t2]=await Promise.all([
+    get('mid_land2',landReg,cur), get('mid_temp2',regId,cur),
+    get('mid_land2',landReg,prev), get('mid_temp2',regId,prev)
+  ]);
 
   // KMA OpenAPI 에러(서비스키 미등록·한도초과·활용신청 필요 등) 감지
   const kmaErr=(d)=>{
+    if(d?.__err)return `요청 실패: ${d.__err}`;
+    if(d?.error)return `${d.error}${d.raw?': '+d.raw:''}`;
     if(d?.OpenAPI_ServiceResponse){
       const h=d.OpenAPI_ServiceResponse.cmmMsgHeader||{};
       return `${h.errMsg||h.returnAuthMsg||'KMA 에러'}${h.returnReasonCode?'('+h.returnReasonCode+')':''}`;
     }
-    // apihub.kma.go.kr 신형 에러: {result:{status,message}}
     if(d?.result?.status&&d.result.status!==200){
       return `KMA ${d.result.status}: ${d.result.message||''}`;
     }
@@ -388,46 +433,33 @@ async function fetchMid(regId,dayOff){
     if(rc&&rc!=='00')return `KMA(${rc}): ${d.response.header.resultMsg||''}`;
     return null;
   };
-  const lErr=kmaErr(land), tErr=kmaErr(temp);
+  const pick=d=>d?.response?.body?.items?.item?.[0];
 
-  let li=land.response?.body?.items?.item?.[0];
-  let ti=temp.response?.body?.items?.item?.[0];
+  // 최신 발표 우선, 최신에 없는 일차만 이전 발표로 보충
+  const li={...shiftFields(pick(l2),prevShift),...shiftFields(pick(l1),curShift)};
+  const ti={...shiftFields(pick(t2),prevShift),...shiftFields(pick(t1),curShift)};
 
-  // 에러도 없고 데이터도 없으면 → 이전 발표시각 재시도 (발표 직후 미생성 케이스)
-  if((!li||!ti)&&!lErr&&!tErr){
-    const prevTmFc=getPrevMidTmFc();
-    const[land2,temp2]=await Promise.all([
-      !li?fetch(`/api/weather?type=mid_land&regId=${regId}&tmFc=${prevTmFc}`).then(r=>r.json()):Promise.resolve(land),
-      !ti?fetch(`/api/weather?type=mid_temp&regId=${regId}&tmFc=${prevTmFc}`).then(r=>r.json()):Promise.resolve(temp)
-    ]);
-    if(!li)li=land2.response?.body?.items?.item?.[0];
-    if(!ti)ti=temp2.response?.body?.items?.item?.[0];
+  if(Object.keys(li).length<=1&&Object.keys(ti).length<=1){
+    const err=kmaErr(l1)||kmaErr(t1)||kmaErr(l2)||kmaErr(t2);
+    if(err)throw new Error(`중기예보 실패 — ${err}`);
+    console.error('KMA mid_land2:',l1,l2);
+    console.error('KMA mid_temp2:',t1,t2);
+    throw new Error(`중기예보 데이터 없음 (기온 ${regId} / 육상 ${landReg})`);
   }
-
-  // KMA 에러 메시지 우선 표시
-  if(lErr&&tErr)throw new Error(`중기예보 실패 — ${lErr}`);
-  if(lErr)throw new Error(`중기육상예보 — ${lErr}`);
-  if(tErr)throw new Error(`중기기온예보 — ${tErr}`);
-  if(!li&&!ti){
-    // 응답 구조 미확인 — 원본을 콘솔과 에러 메시지에 노출
-    console.error('KMA mid_land response:',land);
-    console.error('KMA mid_temp response:',temp);
-    const dump=(d)=>{
-      if(d==null)return 'null';
-      if(typeof d!=='object')return String(d).substring(0,150);
-      const keys=Object.keys(d).join(',')||'(empty)';
-      return `[${keys}] `+JSON.stringify(d).substring(0,180);
-    };
-    throw new Error(`응답 구조 확인 필요 — 육상: ${dump(land)} | 기온: ${dump(temp)}`);
-  }
-  if(!li)throw new Error(`중기육상예보 데이터 없음 (지역코드: ${regId})`);
-  if(!ti)throw new Error(`중기기온예보 데이터 없음 (지역코드: ${regId})`);
 
   const d=dayOff;
-  const amPop=parseInt(li[`rnSt${d}Am`]??li[`rnSt${d}`]??0);
-  const pmPop=parseInt(li[`rnSt${d}Pm`]??li[`rnSt${d}`]??0);
-  const minT=parseFloat(ti[`taMin${d}`]??ti[`taMin${d}Low`]??10);
-  const maxT=parseFloat(ti[`taMax${d}`]??ti[`taMax${d}High`]??20);
+  const amRaw=li[`rnSt${d}Am`]??li[`rnSt${d}`];
+  const pmRaw=li[`rnSt${d}Pm`]??li[`rnSt${d}`];
+
+  // 강수확률 결측을 0%로 대체하면 시공가능으로 오판하게 된다 — 표시하지 않고 알린다
+  if(amRaw===undefined&&pmRaw===undefined){
+    throw new Error(`${d}일 후 강수확률이 아직 발표되지 않았습니다. 기상청은 06시·18시에 발표하며, 먼 날짜는 시간이 지나야 채워집니다.`);
+  }
+
+  const amPop=parseInt(amRaw??pmRaw??0);
+  const pmPop=parseInt(pmRaw??amRaw??0);
+  const minT=parseFloat(ti[`taMin${d}`]??10);
+  const maxT=parseFloat(ti[`taMax${d}`]??20);
   const avgRh=70;
 
   // 현실적인 일중 기온 곡선 (새벽 최저 → 오후2시 최고 → 야간 하강)
