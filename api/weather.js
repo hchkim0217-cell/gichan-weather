@@ -12,7 +12,8 @@ export default async function handler(req, res) {
     const path = type === 'short'
       ? 'VilageFcstInfoService_2.0/getVilageFcst'
       : 'VilageFcstInfoService_2.0/getUltraSrtFcst';
-    const numRows = type === 'short' ? 1000 : 300;
+    // 단기예보는 3일차까지 커버해야 하므로 여유 있게 받는다 (1000이면 마지막 날이 잘릴 수 있음)
+    const numRows = type === 'short' ? 1300 : 300;
     const url = `https://apihub.kma.go.kr/api/typ02/openApi/${path}`
       + `?pageNo=1&numOfRows=${numRows}&dataType=JSON`
       + `&base_date=${base_date}&base_time=${base_time}`

@@ -671,8 +671,13 @@ async function doLoad(){
   try{
     ST._s=0;
     let wx;
-    if(ST.dayOff<=2){
+    // 기상청 중기예보는 4일 후부터 제공한다. 3일 후는 단기예보가 커버하므로 단기를 먼저 쓴다.
+    if(ST.dayOff<=3){
       wx=await fetchShort(dist.la,dist.lo,ST.dayOff);
+      // 발표시각에 따라 3일차가 부분적일 수 있다 — 부족하면 중기예보로 대체
+      if(ST.dayOff===3 && (!wx.hourly || wx.hourly.length<12)){
+        wx=await fetchMid(dist.midRegId,ST.dayOff);
+      }
     } else {
       wx=await fetchMid(dist.midRegId,ST.dayOff);
     }
