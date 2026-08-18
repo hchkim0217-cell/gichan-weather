@@ -19,6 +19,10 @@ header{background:#1e3a5f;color:#fff;padding:0 16px;display:flex;align-items:cen
 .logo{background:#fff;color:#1e3a5f;font-weight:900;font-size:18px;padding:2px 10px;border-radius:6px;flex-shrink:0}
 .hd{flex:1}.hd h1{font-size:14px;font-weight:700}.hd p{font-size:10px;opacity:.7}
 .hclock{text-align:right;font-size:10px;opacity:.8;flex-shrink:0}
+.hrefresh{flex-shrink:0;width:40px;height:40px;border:none;border-radius:10px;background:rgba(255,255,255,.16);color:#fff;font-size:18px;line-height:1;padding:0;cursor:pointer}
+.hrefresh:active{background:rgba(255,255,255,.34)}
+.hrefresh.spin{animation:hspin .8s linear infinite}
+@keyframes hspin{to{transform:rotate(360deg)}}
 .hclock span{font-size:14px;font-weight:700;display:block}
 main{padding:12px;max-width:680px;margin:0 auto}
 .ctrl{margin-bottom:10px}
@@ -49,7 +53,11 @@ main{padding:12px;max-width:680px;margin:0 auto}
 .tmrwarn .tw2{font-size:13px;opacity:.9}
 
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
-@media(max-width:480px){.grid2{grid-template-columns:1fr}}
+@media(max-width:480px){.grid2{grid-template-columns:1fr}
+/* 좁은 화면: 헤더에 갱신 버튼 자리를 확보하기 위해 부제를 숨기고 제목을 한 줄로 고정 */
+.hd p{display:none}
+.hd h1{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hclock span{font-size:13px}}
 .stitle{font-size:12px;color:#1e3a5f;font-weight:900;letter-spacing:.3px;margin-bottom:12px}
 .tsep{margin-bottom:12px;padding-bottom:12px;border-bottom:1.5px solid #f1f5f9}
 .tlabel{font-size:12px;color:#64748b;font-weight:700;margin-bottom:6px}
@@ -96,6 +104,7 @@ main{padding:12px;max-width:680px;margin:0 auto}
   <div class="logo">기찬</div>
   <div class="hd"><h1>기찬시설관리(주)</h1><p>현장 시공·안전 통합 관리 시스템</p></div>
   <div class="hclock"><span id="clock"></span><span id="lupd"></span></div>
+  <button id="hrefresh" class="hrefresh" onclick="doLoad()" aria-label="새로고침" title="새로고침">🔄</button>
 </header>
 
 <main>
@@ -654,6 +663,7 @@ const ST={region:'서울',distIdx:6,mat:'none',dayOff:0,prevP:null,flashT:null,_
 
 async function doLoad(){
   const dl=LOC[ST.region],dist=dl[ST.distIdx]||dl[0];
+  const hrb=document.getElementById('hrefresh'); if(hrb)hrb.classList.add('spin');
   show('loading');setStep(0);
   const si=setInterval(()=>{ST._s=Math.min((ST._s||0)+1,2);setStep(ST._s);},2500);
   try{
@@ -668,7 +678,7 @@ async function doLoad(){
   }catch(e){
     document.getElementById('errmsg').textContent=e.message;
     show('errbox');
-  }finally{clearInterval(si);ST._s=0;}
+  }finally{clearInterval(si);ST._s=0;if(hrb)hrb.classList.remove('spin');}
 }
 
 function initDays(){
