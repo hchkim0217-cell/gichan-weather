@@ -154,12 +154,32 @@ async function fetchShortDays(origin, la, lo) {
   return byDate;
 }
 
+// 중기육상예보 구역코드(광역) 매핑 — 기온은 도시코드, 육상은 광역코드로 체계가 다르다
+// 11B(서울·인천·경기)만 11B00000 단일 구역이고, 나머지는 앞 4자리 + 0000
+function toLandRegId(cityRegId) {
+  const p4 = String(cityRegId).substring(0, 4);
+  if (p4.startsWith('11B')) return '11B00000';
+  return p4 + '0000';
+}
+
+// 중기예보 typ02 JSON 직접 호출 (getMidLandFcst / getMidTa 는 활용신청 승인됨)
 async function fetchMid(origin, regId) {
-  const get = async (type, tmFc) => {
-    const r = await fetch(`${origin}/api/weather?type=${type}&regId=${regId}&tmFc=${tmFc}`);
-    return await r.json();
+  const KEY = process.env.KMA_API_KEY;
+  const landReg = toLandRegId(regId);
+
+  const call = async (svc, reg, tm) => {
+    const url = `https://apihub.kma.go.kr/api/typ02/openApi/MidFcstInfoService/${svc}`
+      + `?pageNo=1&numOfRows=10&dataType=JSON&regId=${reg}&tmFc=${tm}&authKey=${KEY}`;
+    try {
+      const r = await fetch(url);
+      const txt = await r.text();
+      try { return JSON.parse(txt); } catch { return { __raw: txt.substring(0, 200) }; }
+    } catch (e) { return { __err: e.message }; }
   };
+
   const kmaErr = d => {
+    if (d?.__err) return `요청 실패: ${d.__err}`;
+    if (d?.__raw) return `JSON 아님: ${d.__raw}`;
     if (d?.OpenAPI_ServiceResponse) {
       const h = d.OpenAPI_ServiceResponse.cmmMsgHeader || {};
       return `${h.errMsg || h.returnAuthMsg || 'KMA 에러'}${h.returnReasonCode ? '(' + h.returnReasonCode + ')' : ''}`;
@@ -169,22 +189,28 @@ async function fetchMid(origin, regId) {
     if (rc && rc !== '00') return `KMA(${rc}): ${d.response.header.resultMsg || ''}`;
     return null;
   };
+  const pick = d => d?.response?.body?.items?.item?.[0];
+  const empty = o => !o || Object.keys(o).length <= 1;
 
   const tmFc = getMidTmFc();
-  let [land, temp] = await Promise.all([get('mid_land', tmFc), get('mid_temp', tmFc)]);
+  let [land, temp] = await Promise.all([
+    call('getMidLandFcst', landReg, tmFc),
+    call('getMidTa', regId, tmFc)
+  ]);
   const lErr = kmaErr(land), tErr = kmaErr(temp);
-  let li = land?.response?.body?.items?.item?.[0];
-  let ti = temp?.response?.body?.items?.item?.[0];
+  let li = pick(land), ti = pick(temp);
 
   // 발표 직후 미생성 케이스 → 이전 발표시각 재시도
-  const empty = o => !o || Object.keys(o).length <= 1;
   if ((empty(li) || empty(ti)) && !lErr && !tErr) {
     const prev = getPrevMidTmFc();
-    const [land2, temp2] = await Promise.all([get('mid_land', prev), get('mid_temp', prev)]);
-    if (empty(li)) li = land2?.response?.body?.items?.item?.[0];
-    if (empty(ti)) ti = temp2?.response?.body?.items?.item?.[0];
+    const [land2, temp2] = await Promise.all([
+      call('getMidLandFcst', landReg, prev),
+      call('getMidTa', regId, prev)
+    ]);
+    if (empty(li)) li = pick(land2);
+    if (empty(ti)) ti = pick(temp2);
   }
-  return { li: li || {}, ti: ti || {}, err: lErr || tErr || null };
+  return { li: li || {}, ti: ti || {}, err: lErr || tErr || null, landReg };
 }
 
 function midToHourly(li, ti, d) {
@@ -194,6 +220,9 @@ function midToHourly(li, ti, d) {
   const maxT = parseFloat(ti[`taMax${d}`] ?? NaN);
   if (isNaN(amPop) && isNaN(pmPop) && isNaN(minT) && isNaN(maxT)) return null;
 
+  // 강수확률이 통째로 없으면 0%로 위장하면 안 된다 — 시공가능으로 오판하게 된다
+  const popMissing = isNaN(amPop) && isNaN(pmPop);
+  const tempMissing = isNaN(minT) && isNaN(maxT);
   const ap = isNaN(amPop) ? 0 : amPop, pp = isNaN(pmPop) ? 0 : pmPop;
   const mn = isNaN(minT) ? 10 : minT, mx = isNaN(maxT) ? 20 : maxT;
   const hourly = [];
@@ -205,7 +234,7 @@ function midToHourly(li, ti, d) {
     const pop = h < 12 ? ap : pp;
     hourly.push({ h, t, rh: 70, p: pop, rain: pop >= 50 ? 1 : 0, pty: pop >= 50 ? 1 : 0 });
   }
-  return { hourly, minT: mn, maxT: mx, amPop: ap, pmPop: pp, wf: li[`wf${d}Am`] || li[`wf${d}`] || '' };
+  return { hourly, minT: mn, maxT: mx, amPop: ap, pmPop: pp, popMissing, tempMissing, wf: li[`wf${d}Am`] || li[`wf${d}`] || '' };
 }
 
 // ── ICS 조립 ─────────────────────────────────────────────────────────
@@ -266,6 +295,42 @@ export default async function handler(req, res) {
   if (isNaN(la) || isNaN(lo) || !reg) { la = 37.5640; lo = 126.9975; reg = '11B10101'; name = name || '서울 중구'; }
   name = name || '현장';
 
+  // 진단 모드: 중기예보 typ02 원본 JSON을 그대로 확인한다 (authKey는 출력하지 않음)
+  if (q.debug === 'mid') {
+    const KEY = process.env.KMA_API_KEY;
+    const tmFc = getMidTmFc();
+    const landReg = toLandRegId(reg);
+    const pull = async (svc, r2) => {
+      const u = `https://apihub.kma.go.kr/api/typ02/openApi/MidFcstInfoService/${svc}`
+        + `?pageNo=1&numOfRows=10&dataType=JSON&regId=${r2}&tmFc=${tmFc}&authKey=${KEY}`;
+      try { return await (await fetch(u)).text(); } catch (e) { return `FETCH ERROR: ${e.message}`; }
+    };
+    const [wl, wc] = await Promise.all([pull('getMidLandFcst', landReg), pull('getMidTa', reg)]);
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).send(
+      `### tmFc=${tmFc}\n### 육상 regId=${landReg} (광역) / 기온 regId=${reg} (도시)\n\n`
+      + `===== getMidLandFcst =====\n${wl.substring(0, 3000)}\n\n===== getMidTa =====\n${wc.substring(0, 2000)}\n`
+    );
+  }
+
+  // 진단 모드 2: 기존 typ01 텍스트 원본 확인 (파싱 실패 원인 대조용)
+  if (q.debug === 'mid01') {
+    const KEY = process.env.KMA_API_KEY;
+    const tmfc10 = getMidTmFc().substring(0, 10);
+    const pull = async (php, r2) => {
+      const u = `https://apihub.kma.go.kr/api/typ01/url/${php}`
+        + `?reg=${r2}&tmfc1=${tmfc10}&tmfc2=${tmfc10}&disp=0&help=1&authKey=${KEY}`;
+      try { return await (await fetch(u)).text(); } catch (e) { return `FETCH ERROR: ${e.message}`; }
+    };
+    const [wl, wc] = await Promise.all([pull('fct_afs_wl.php', reg), pull('fct_afs_wc.php', reg)]);
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).send(
+      `### reg=${reg} tmfc=${tmfc10}\n\n===== fct_afs_wl.php (육상) =====\n${wl.substring(0, 4000)}\n\n===== fct_afs_wc.php (기온) =====\n${wc.substring(0, 2500)}\n`
+    );
+  }
+
   const days = Math.min(10, Math.max(1, parseInt(q.days || '7')));
   const proto = req.headers['x-forwarded-proto'] || 'https';
   const origin = `${proto}://${req.headers.host}`;
@@ -284,16 +349,22 @@ export default async function handler(req, res) {
 
     for (let off = 0; off < days; off++) {
       const dstr = dateStr(off);
-      let hourly = null, minT = null, maxT = null, wf = '', src = '';
+      let hourly = null, minT = null, maxT = null, wf = '', src = '', popMissing = false, partial = false;
 
-      if (shortByDate[dstr] && shortByDate[dstr].length >= 12) {
+      // 오늘은 이미 지난 시간대가 빠져 슬롯이 적으므로 개수 조건을 두지 않는다
+      const minSlots = off === 0 ? 1 : 12;
+      if (shortByDate[dstr] && shortByDate[dstr].length >= minSlots) {
         hourly = shortByDate[dstr];
         minT = Math.min(...hourly.map(s => s.t));
         maxT = Math.max(...hourly.map(s => s.t));
         src = '단기예보';
+        partial = off === 0 && hourly.length < 12;
       } else if (mid && off >= 3) {
         const m = midToHourly(mid.li, mid.ti, off);
-        if (m) { hourly = m.hourly; minT = m.minT; maxT = m.maxT; wf = m.wf; src = '중기예보'; }
+        if (m) {
+          hourly = m.hourly; minT = m.minT; maxT = m.maxT; wf = m.wf;
+          src = '중기예보'; popMissing = m.popMissing;
+        }
       }
       if (!hourly) continue;
 
@@ -304,12 +375,22 @@ export default async function handler(req, res) {
       const jud = getJudge(amProb, pmProb, lateRainStart);
       const maxProb = Math.max(amProb, pmProb);
 
-      const summary = `${jud.sig} ${jud.short} · ${Math.round(minT)}~${Math.round(maxT)}℃ · 강수 ${maxProb}%`;
+      const summary = popMissing
+        ? `⚪ 판정보류 · ${Math.round(minT)}~${Math.round(maxT)}℃ · 강수확률 없음`
+        : `${jud.sig} ${jud.short} · ${Math.round(minT)}~${Math.round(maxT)}℃ · 강수 ${maxProb}%`;
 
       const desc = [];
-      desc.push(`[시공판정] ${jud.label} — ${jud.sub}`);
+      if (popMissing) {
+        desc.push('[시공판정] ⚪ 판정 보류 — 기상청이 이 날짜의 강수확률을 아직 제공하지 않음');
+      } else {
+        desc.push(`[시공판정] ${jud.label} — ${jud.sub}`);
+      }
       desc.push(`[기온] 최저 ${minT.toFixed(1)}℃ / 최고 ${maxT.toFixed(1)}℃`);
-      desc.push(`[강수확률] 오전 ${amProb}% / 오후 ${pmProb}%`);
+      if (popMissing) {
+        desc.push('[강수확률] 데이터 없음 — 0%가 아니라 미제공이다. 날짜가 가까워지면 채워진다.');
+      } else {
+        desc.push(`[강수확률] 오전 ${amProb}% / 오후 ${pmProb}%`);
+      }
       if (rainInfo) {
         desc.push(`[강수시간] ${hh(rainInfo.sH)} ~ ${hh(rainInfo.eH)}${rainInfo.total > 0 ? ` · 합계 ${rainInfo.total}mm` : ''}`);
         const rows = rainInfo.am.filter(a => a.mm > 0).map(a => `  ${hh(a.h)}  ${a.mm}mm`);
@@ -320,7 +401,7 @@ export default async function handler(req, res) {
         desc.push('[강수시간] 강수 예보 없음');
       }
       if (wf) desc.push(`[하늘상태] ${wf}`);
-      desc.push(`[예보구분] ${src}${src === '중기예보' ? ' (오차 큼 · 참고용)' : ''}`);
+      desc.push(`[예보구분] ${src}${src === '중기예보' ? ' (오차 큼 · 참고용)' : ''}${partial ? ' · 잔여 시간대 기준' : ''}`);
       desc.push('');
       desc.push(`현장 상세 확인 ${APP_URL}`);
 
