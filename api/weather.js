@@ -63,7 +63,16 @@ async function handleMidTyp01(res, KEY, type, regId, tmFc) {
 
   try {
     const r = await fetch(url);
-    const text = await r.text();
+    // typ01 텍스트는 EUC-KR로 내려온다. r.text()로 읽으면 하늘상태(wf) 한글이 깨진다.
+    const buf = await r.arrayBuffer();
+    let text;
+    try {
+      text = new TextDecoder('euc-kr').decode(buf);
+      // 디코더가 euc-kr을 모르면 치환문자가 섞인다 → UTF-8로 되돌린다
+      if (text.indexOf('\uFFFD') >= 0) text = new TextDecoder('utf-8').decode(buf);
+    } catch {
+      text = new TextDecoder('utf-8').decode(buf);
+    }
 
     const trimmed = text.trim();
     if (trimmed.startsWith('{')) {

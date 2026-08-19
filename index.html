@@ -425,9 +425,12 @@ async function fetchMid(regId,dayOff){
     }catch(e){ return {__err:e.message}; }
   };
 
-  const packs=await Promise.all(TMS.map(async tm=>({
-    land:await get('mid_land2',landReg,tm),
-    temp:await get('mid_temp2',regId,tm)
+  // typ02 JSON은 과거 발표시각(tmFc)을 받아주지 않는다 — 이전 발표를 요청하면
+  // {응답:{헤더:{결과코드:'03', 결과메시지:'데이터 없음'}}}가 돌아와 병합이 무력화된다.
+  // typ01 텍스트는 과거 발표 조회가 되므로, 최신 발표만 typ02로 받고 보충은 typ01로 받는다.
+  const packs=await Promise.all(TMS.map(async (tm,i)=>({
+    land:await get(i===0?'mid_land2':'mid_land',landReg,tm),
+    temp:await get(i===0?'mid_temp2':'mid_temp',regId,tm)
   })));
 
   // KMA OpenAPI 에러(서비스키 미등록·한도초과·활용신청 필요 등) 감지
@@ -443,6 +446,9 @@ async function fetchMid(regId,dayOff){
     }
     const rc=d?.response?.header?.resultCode;
     if(rc&&rc!=='00')return `KMA(${rc}): ${d.response.header.resultMsg||''}`;
+    // apihub가 한글 키로 내려주는 형식 (예: 과거 발표 요청 시 결과코드 03)
+    const rcK=d?.['\uc751\ub2f5']?.['\ud5e4\ub354']?.['\uacb0\uacfc\ucf54\ub4dc'];
+    if(rcK&&rcK!=='00')return `KMA(${rcK}): ${d['\uc751\ub2f5']['\ud5e4\ub354']['\uacb0\uacfc\uba54\uc2dc\uc9c0']||''}`;
     return null;
   };
   const pick=d=>d?.response?.body?.items?.item?.[0];
@@ -779,4 +785,4 @@ setInterval(doLoad,10*60*1000);
 initDays();initReg();initDist();show('empty');doLoad();
 </script>
 </body>
-</html>
+</html>
