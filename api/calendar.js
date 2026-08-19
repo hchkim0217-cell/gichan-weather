@@ -68,21 +68,24 @@ function getShortBase() {
   return { base_date: ymd(bd), base_time: String(bh).padStart(2, '0') + '00' };
 }
 
-function getMidTmFc() {
+// 중기예보 발표시각을 k회 거슬러 올라가 반환한다 (k=0 최신, 1 직전, 2 그 전…).
+// 발표는 매일 06시·18시 두 번이다. 서버는 UTC이므로 kstNow() 기준 UTC 필드를 읽는다.
+function midTmFcSeq(k) {
   const now = kstNow(), h = now.getUTCHours();
-  if (h >= 18) return `${ymd(now)}1800`;
-  if (h >= 6) return `${ymd(now)}0600`;
-  const yd = new Date(now); yd.setUTCDate(yd.getUTCDate() - 1);
-  return `${ymd(yd)}1800`;
+  const base = new Date(now);
+  let slot;
+  if (h >= 18) slot = 18;
+  else if (h >= 6) slot = 6;
+  else { base.setUTCDate(base.getUTCDate() - 1); slot = 18; }
+  for (let i = 0; i < k; i++) {
+    if (slot === 18) slot = 6;
+    else { slot = 18; base.setUTCDate(base.getUTCDate() - 1); }
+  }
+  return `${ymd(base)}${slot === 18 ? '1800' : '0600'}`;
 }
 
-function getPrevMidTmFc() {
-  const now = kstNow(), h = now.getUTCHours();
-  if (h >= 18) return `${ymd(now)}0600`;
-  const yd = new Date(now); yd.setUTCDate(yd.getUTCDate() - 1);
-  if (h >= 6) return `${ymd(yd)}1800`;
-  return `${ymd(yd)}0600`;
-}
+function getMidTmFc() { return midTmFcSeq(0); }
+function getPrevMidTmFc() { return midTmFcSeq(1); }
 
 const hh = h => `${String(Math.max(0, Math.min(23, h))).padStart(2, '0')}:00`;
 
@@ -218,22 +221,24 @@ async function fetchMid(origin, regId) {
   };
   const pick = d => d?.response?.body?.items?.item?.[0];
 
-  const cur = getMidTmFc(), prev = getPrevMidTmFc();
-  const curShift = ymdDiff(cur.substring(0, 8), today);
-  const prevShift = ymdDiff(prev.substring(0, 8), today);
+  // 06시 발표는 4일차부터, 18시 발표는 5일차부터 제공한다.
+  // 최신 발표만 보면 3일차가 통째로 비므로(단기예보 커버 범위 밖) 발표 4회를 받아 병합한다.
+  const TMS = [0, 1, 2, 3].map(midTmFcSeq);
+  const SHIFTS = TMS.map(t => ymdDiff(t.substring(0, 8), today));
 
-  const [land1, temp1, land2, temp2] = await Promise.all([
-    call('getMidLandFcst', landReg, cur),
-    call('getMidTa', regId, cur),
-    call('getMidLandFcst', landReg, prev),
-    call('getMidTa', regId, prev)
-  ]);
+  const packs = await Promise.all(TMS.map(async tm => ({
+    land: await call('getMidLandFcst', landReg, tm),
+    temp: await call('getMidTa', regId, tm)
+  })));
 
-  const err = kmaErr(land1) || kmaErr(temp1) || null;
+  const err = kmaErr(packs[0].land) || kmaErr(packs[0].temp) || null;
 
-  // 최신 발표 우선, 최신에 없는 일차만 이전 발표로 보충
-  const li = { ...shiftFields(pick(land2), prevShift), ...shiftFields(pick(land1), curShift) };
-  const ti = { ...shiftFields(pick(temp2), prevShift), ...shiftFields(pick(temp1), curShift) };
+  // 오래된 발표부터 차례로 덮어쓴다 → 최신 발표가 우선, 빈 일차만 이전 발표로 보충
+  let li = {}, ti = {};
+  for (let i = TMS.length - 1; i >= 0; i--) {
+    li = { ...li, ...shiftFields(pick(packs[i].land), SHIFTS[i]) };
+    ti = { ...ti, ...shiftFields(pick(packs[i].temp), SHIFTS[i]) };
+  }
 
   return { li, ti, err: (Object.keys(li).length <= 1 && Object.keys(ti).length <= 1) ? err : null, landReg };
 }

@@ -254,27 +254,26 @@ function getUltraBase(){
   return{base_date:`${y}${mn}${d}`,base_time:String(h).padStart(2,'0')+'30'};
 }
 
-function getMidTmFc(){
+// 중기예보 발표시각을 k회 거슬러 올라가 반환한다 (k=0 최신, 1 직전, 2 그 전…).
+// 발표는 매일 06시·18시 두 번이다.
+function midTmFcSeq(k){
   const now=new Date();
   const h=now.getHours();
-  const y=now.getFullYear(),m=String(now.getMonth()+1).padStart(2,'0'),d=String(now.getDate()).padStart(2,'0');
-  if(h>=18) return `${y}${m}${d}1800`;
-  if(h>=6)  return `${y}${m}${d}0600`;
-  const yd=new Date(now); yd.setDate(yd.getDate()-1);
-  const yy=yd.getFullYear(),ym=String(yd.getMonth()+1).padStart(2,'0'),ydd=String(yd.getDate()).padStart(2,'0');
-  return `${yy}${ym}${ydd}1800`;
+  const base=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  let slot;
+  if(h>=18) slot=18;
+  else if(h>=6) slot=6;
+  else { base.setDate(base.getDate()-1); slot=18; }
+  for(let i=0;i<k;i++){
+    if(slot===18) slot=6;
+    else { slot=18; base.setDate(base.getDate()-1); }
+  }
+  const y=base.getFullYear(),m=String(base.getMonth()+1).padStart(2,'0'),d=String(base.getDate()).padStart(2,'0');
+  return `${y}${m}${d}${slot===18?'1800':'0600'}`;
 }
 
-function getPrevMidTmFc(){
-  const now=new Date();
-  const h=now.getHours();
-  const y=now.getFullYear(),m=String(now.getMonth()+1).padStart(2,'0'),d=String(now.getDate()).padStart(2,'0');
-  if(h>=18) return `${y}${m}${d}0600`;
-  const yd=new Date(now); yd.setDate(yd.getDate()-1);
-  const yy=yd.getFullYear(),ym=String(yd.getMonth()+1).padStart(2,'0'),ydd=String(yd.getDate()).padStart(2,'0');
-  if(h>=6) return `${yy}${ym}${ydd}1800`;
-  return `${yy}${ym}${ydd}0600`;
-}
+function getMidTmFc(){ return midTmFcSeq(0); }
+function getPrevMidTmFc(){ return midTmFcSeq(1); }
 
 function dateStr(off){
   const d=new Date();d.setDate(d.getDate()+off);
@@ -413,9 +412,11 @@ function shiftFields(item,shift){
 async function fetchMid(regId,dayOff){
   const landReg=toLandRegId(regId);
   const today=dateStr(0);
-  const cur=getMidTmFc(), prev=getPrevMidTmFc();
-  const curShift=ymdDiff(cur.substring(0,8),today);
-  const prevShift=ymdDiff(prev.substring(0,8),today);
+  // 06시 발표는 4일차부터, 18시 발표는 5일차부터 제공한다.
+  // 최신 발표만 보면 3일차가 통째로 비므로(단기예보 커버 범위 밖) 발표 4회를 받아 병합한다.
+  // 예: 오늘 14시 → 어제 06시 발표의 4일차가 오늘 기준 3일차로 정규화되어 채워진다.
+  const TMS=[0,1,2,3].map(midTmFcSeq);
+  const SHIFTS=TMS.map(t=>ymdDiff(t.substring(0,8),today));
 
   const get=async(type,reg,tm)=>{
     try{
@@ -424,12 +425,10 @@ async function fetchMid(regId,dayOff){
     }catch(e){ return {__err:e.message}; }
   };
 
-  // 06시 발표는 4일차부터, 18시 발표는 5일차부터 제공한다.
-  // 두 발표를 모두 받아 병합해야 4일차 공백이 생기지 않는다.
-  const[l1,t1,l2,t2]=await Promise.all([
-    get('mid_land2',landReg,cur), get('mid_temp2',regId,cur),
-    get('mid_land2',landReg,prev), get('mid_temp2',regId,prev)
-  ]);
+  const packs=await Promise.all(TMS.map(async tm=>({
+    land:await get('mid_land2',landReg,tm),
+    temp:await get('mid_temp2',regId,tm)
+  })));
 
   // KMA OpenAPI 에러(서비스키 미등록·한도초과·활용신청 필요 등) 감지
   const kmaErr=(d)=>{
@@ -448,15 +447,17 @@ async function fetchMid(regId,dayOff){
   };
   const pick=d=>d?.response?.body?.items?.item?.[0];
 
-  // 최신 발표 우선, 최신에 없는 일차만 이전 발표로 보충
-  const li={...shiftFields(pick(l2),prevShift),...shiftFields(pick(l1),curShift)};
-  const ti={...shiftFields(pick(t2),prevShift),...shiftFields(pick(t1),curShift)};
+  // 오래된 발표부터 차례로 덮어쓴다 → 최신 발표가 우선, 빈 일차만 이전 발표로 보충
+  let li={}, ti={};
+  for(let i=TMS.length-1;i>=0;i--){
+    li={...li,...shiftFields(pick(packs[i].land),SHIFTS[i])};
+    ti={...ti,...shiftFields(pick(packs[i].temp),SHIFTS[i])};
+  }
 
   if(Object.keys(li).length<=1&&Object.keys(ti).length<=1){
-    const err=kmaErr(l1)||kmaErr(t1)||kmaErr(l2)||kmaErr(t2);
+    const err=packs.map(p=>kmaErr(p.land)||kmaErr(p.temp)).find(Boolean);
     if(err)throw new Error(`중기예보 실패 — ${err}`);
-    console.error('KMA mid_land2:',l1,l2);
-    console.error('KMA mid_temp2:',t1,t2);
+    console.error('KMA mid 발표별 응답:',TMS.map((tm,i)=>({tmFc:tm,land:packs[i].land,temp:packs[i].temp})));
     throw new Error(`중기예보 데이터 없음 (기온 ${regId} / 육상 ${landReg})`);
   }
 
